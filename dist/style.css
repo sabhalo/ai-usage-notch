@@ -1,0 +1,155 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  overflow: hidden;
+  font-family: -apple-system, "Segoe UI", "Segoe UI Variable", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
+
+.notch {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.pill {
+  display: flex;
+  align-items: center;
+  height: 46px;
+  padding: 0 10px;
+  background: #121214;
+  border-radius: 0 0 16px 16px;
+  gap: 6px;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
+}
+
+.provider {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 10px;
+  transition: background 0.15s ease;
+}
+
+.provider:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.divider {
+  width: 1px;
+  height: 20px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.ring {
+  position: relative;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ring svg {
+  position: absolute;
+  inset: 0;
+  transform: rotate(-90deg);
+}
+
+.ring-bg {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.15);
+  stroke-width: 3;
+}
+
+.ring-fg {
+  fill: none;
+  stroke: #22c55e;
+  stroke-width: 3;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.4s ease, stroke 0.4s ease;
+}
+
+.icon {
+  position: relative;
+  font-size: 10px;
+  color: #f2f2f4;
+}
+
+.pct {
+  color: #f2f2f4;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  min-width: 30px;
+}
+
+.detail {
+  width: 220px;
+  margin-top: 6px;
+  background: #121214;
+  border-radius: 14px;
+  padding: 12px 14px;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.4);
+}
+
+.detail-title {
+  color: #f2f2f4;
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 10px;
+}
+
+.detail-row {
+  margin-bottom: 10px;
+}
+
+.detail-row:last-child {
+  margin-bottom: 0;
+}
+
+.detail-row-top {
+  display: flex;
+  justify-content: space-between;
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 11px;
+  margin-bottom: 5px;
+}
+
+.bar {
+  width: 100%;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.4s ease, background 0.4s ease;
+}
+
+.detail-row-pct {
+  margin-top: 4px;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 10px;
+}
+
+.detail-error {
+  color: #f59e0b;
+  font-size: 11px;
+  line-height: 1.4;
+}

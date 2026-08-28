@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AI Usage</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="notch">
+    <div class="pill">
+      <button class="provider" id="claude-btn" data-provider="claude" title="Claude">
+        <span class="ring">
+          <svg viewBox="0 0 36 36">
+            <circle class="ring-bg" cx="18" cy="18" r="15.5"></circle>
+            <circle class="ring-fg" id="claude-ring-fg" cx="18" cy="18" r="15.5"></circle>
+          </svg>
+          <span class="icon">✦</span>
+        </span>
+        <span class="pct" id="claude-pct">—</span>
+      </button>
+      <div class="divider"></div>
+      <button class="provider" id="codex-btn" data-provider="codex" title="Codex">
+        <span class="ring">
+          <svg viewBox="0 0 36 36">
+            <circle class="ring-bg" cx="18" cy="18" r="15.5"></circle>
+            <circle class="ring-fg" id="codex-ring-fg" cx="18" cy="18" r="15.5"></circle>
+          </svg>
+          <span class="icon">◇</span>
+        </span>
+        <span class="pct" id="codex-pct">—</span>
+      </button>
+    </div>
+    <div class="detail" id="detail" hidden>
+      <div class="detail-title" id="detail-title">—</div>
+      <div id="detail-rows"></div>
+      <div class="detail-error" id="detail-error" hidden></div>
+    </div>
+  </div>
+<script src="main.js"></script>
+</body>
+</html>
