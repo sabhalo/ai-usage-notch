@@ -9,12 +9,12 @@ const TICK_MS = 30_000; // granularità del loop di controllo backoff (= primo g
 const BACKOFF_STEPS_S = [30, 300, 900]; // 30s -> 5min -> 15min (cap), per provider
 const CACHE_STALE_MS = 10 * 60 * 1000;
 const AUTO_COLLAPSE_MS = 7000; // plan/step-4.4.md: un solo posto per questo numero
-const EXTENDED_WIDTH = 300; // 220 bastava per 2 anelli, con Copilot serve più spazio (step-2.5)
+const EXTENDED_WIDTH = 360; // 300 bastava per 3 anelli, con Gemini (4°) serve più spazio (issue #4)
 const COMPACT_WIDTH = 170; // solo anelli, percentuale all'hover (step-4.2)
 const COLLAPSED_HEIGHT = 46;
 const EXPANDED_EXTRA_HEIGHT = 150; // deve restare coerente con .detail nel CSS
 
-const PROVIDER_TITLES = { claude: "Claude", codex: "Codex", copilot: "Copilot" };
+const PROVIDER_TITLES = { claude: "Claude", codex: "Codex", copilot: "Copilot", gemini: "Gemini" };
 const UNLIMITED_COLOR = "#8b5cf6"; // viola: distinto dalla scala verde/ambra/rosso, "non applicabile"
 const ERROR_COLOR = "#ef4444";
 const NOT_CONFIGURED_COLOR = "rgba(255, 255, 255, 0.2)";
@@ -23,8 +23,11 @@ const RING_IDS = {
   claude: { pctElId: "claude-pct", ringFgId: "claude-ring-fg", btnId: "claude-btn" },
   codex: { pctElId: "codex-pct", ringFgId: "codex-ring-fg", btnId: "codex-btn" },
   copilot: { pctElId: "copilot-pct", ringFgId: "copilot-ring-fg", btnId: "copilot-btn" },
+  gemini: { pctElId: "gemini-pct", ringFgId: "gemini-ring-fg", btnId: "gemini-btn" },
 };
 
+// Gemini è solo il guscio visivo (issue #4): niente backend Rust ancora, quindi
+// resta fuori da state/everSucceeded/backoff così tick() non lo interroga.
 const state = { claude: null, codex: null, copilot: null };
 // true solo dopo la prima fetch riuscita: distingue "non ancora configurato"
 // (grigio, mai partito) da "ha funzionato e ora fallisce" (rosso, allarme
@@ -394,6 +397,8 @@ win.onMoved(({ payload }) => {
 });
 
 async function boot() {
+  setRingColor(document.getElementById(RING_IDS.gemini.ringFgId), NOT_CONFIGURED_COLOR, 100);
+  document.getElementById(RING_IDS.gemini.pctElId).textContent = "–";
   await loadRuntimeSettings();
   await loadCachedUsage();
   await tick(true); // il primo giro è sempre forzato, non aspetta il primo tick
