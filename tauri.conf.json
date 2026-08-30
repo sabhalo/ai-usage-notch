@@ -16,7 +16,7 @@
         "url": "index.html",
         "width": 360,
         "height": 46,
-        "minWidth": 360,
+        "minWidth": 130,
         "maxWidth": 360,
         "resizable": false,
         "maximizable": false,
