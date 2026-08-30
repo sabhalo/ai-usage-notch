@@ -27,9 +27,9 @@ seven_day.resets_at      (stringa ISO 8601 UTC)
 Shape ipotizzata in origine (`session`/`week`, `resets_in_seconds`,
 `used_percent`) era **sbagliata** su entrambi i fronti: i nomi delle chiavi
 top-level e la forma del reset (data assoluta, non secondi relativi).
-`src/main.rs` converte `resets_at` in una durata con un piccolo parser ISO 8601
-scritto a mano (nessuna dipendenza aggiunta: formato fisso, calcolo civile di
-Hinnant).
+`src/providers/claude.rs` converte `resets_at` in una durata con un piccolo
+parser ISO 8601 scritto a mano (nessuna dipendenza aggiunta: formato fisso,
+calcolo civile di Hinnant).
 
 ## Codex — `GET https://chatgpt.com/backend-api/wham/usage`
 
@@ -45,7 +45,7 @@ rate_limit.secondary_window                     (null se assente, altrimenti ste
 ```
 
 `rate_limit` è singolare, non `rate_limits`. Non c'è `utilization`, c'è
-`used_percent` diretto. `src/main.rs` è stato allineato a questo shape.
+`used_percent` diretto. `src/providers/codex.rs` è allineato a questo shape.
 
 ## Copilot — `GET https://api.github.com/copilot_internal/user`
 

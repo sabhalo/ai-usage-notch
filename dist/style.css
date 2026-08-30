@@ -47,6 +47,63 @@ html, body {
   background: rgba(255, 255, 255, 0.08);
 }
 
+.provider.overage {
+  box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.6) inset;
+}
+
+.provider.not-configured {
+  opacity: 0.45;
+}
+
+.provider.stale {
+  opacity: 0.6;
+}
+
+.provider.alert .ring-fg {
+  animation: pulse-alert 1.2s ease-in-out infinite;
+}
+
+@keyframes pulse-alert {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.settings-btn {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 8px;
+  margin-left: 2px;
+}
+
+.settings-btn:hover {
+  color: #f2f2f4;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* Modalità compatta (step-4.2.md): solo anelli, la percentuale appare
+   all'hover invece di occupare spazio fisso sempre. */
+.pill.compact .provider .pct {
+  opacity: 0;
+  width: 0;
+  min-width: 0;
+  overflow: hidden;
+  transition: opacity 0.15s ease, width 0.15s ease;
+}
+
+.pill.compact .provider:hover .pct {
+  opacity: 1;
+  width: 30px;
+  min-width: 30px;
+}
+
 .divider {
   width: 1px;
   height: 20px;
@@ -97,7 +154,7 @@ html, body {
 }
 
 .detail {
-  width: 220px;
+  width: 300px;
   margin-top: 6px;
   background: #121214;
   border-radius: 14px;
@@ -152,4 +209,33 @@ html, body {
   color: #f59e0b;
   font-size: 11px;
   line-height: 1.4;
+  border-left: 3px solid #f59e0b;
+  padding-left: 8px;
+}
+
+/* Tre casi distinti in UI (plan/step-3.3.md): non loggato (ambra, azione
+   dell'utente), non autorizzato/rete (rosso, problema esterno),
+   endpoint cambiato (blu, azione dello sviluppatore — rilanciare probe). */
+.detail-error[data-kind="NotLoggedIn"] {
+  border-left-color: #f59e0b;
+}
+
+.detail-error[data-kind="Unauthorized"],
+.detail-error[data-kind="Network"] {
+  border-left-color: #ef4444;
+}
+
+.detail-error[data-kind="UnexpectedShape"] {
+  border-left-color: #3b82f6;
+}
+
+.badge-overage {
+  color: #ef4444;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  border: 1px solid rgba(239, 68, 68, 0.5);
+  border-radius: 4px;
+  padding: 1px 4px;
+  margin-left: 4px;
 }

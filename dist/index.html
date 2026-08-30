@@ -8,7 +8,7 @@
 </head>
 <body>
   <div class="notch">
-    <div class="pill">
+    <div class="pill" data-tauri-drag-region>
       <button class="provider" id="claude-btn" data-provider="claude" title="Claude">
         <span class="ring">
           <svg viewBox="0 0 36 36">
@@ -30,6 +30,18 @@
         </span>
         <span class="pct" id="codex-pct">—</span>
       </button>
+      <div class="divider"></div>
+      <button class="provider" id="copilot-btn" data-provider="copilot" title="Copilot">
+        <span class="ring">
+          <svg viewBox="0 0 36 36">
+            <circle class="ring-bg" cx="18" cy="18" r="15.5"></circle>
+            <circle class="ring-fg" id="copilot-ring-fg" cx="18" cy="18" r="15.5"></circle>
+          </svg>
+          <span class="icon">▣</span>
+        </span>
+        <span class="pct" id="copilot-pct">—</span>
+      </button>
+      <button class="settings-btn" id="settings-btn" title="Impostazioni">⚙</button>
     </div>
     <div class="detail" id="detail" hidden>
       <div class="detail-title" id="detail-title">—</div>
