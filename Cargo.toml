@@ -13,6 +13,17 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 dirs = "5"
+tokio = { version = "1", default-features = false, features = ["macros"] }
+tauri-plugin-autostart = "2"
+tauri-plugin-notification = "2"
+
+# Per leggere NSScreen.safeAreaInsets/auxiliaryTopLeftArea (step-5.3.md):
+# stesse versioni già presenti transitivamente via tao/wry, promosse a
+# dipendenza diretta invece di reimplementare i binding a mano.
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6"
+objc2-app-kit = { version = "0.3", features = ["NSScreen"] }
+objc2-foundation = "0.3"
 
 [profile.release]
 panic = "abort"

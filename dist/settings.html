@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Impostazioni — AI Usage</title>
+<link rel="stylesheet" href="settings.css" />
+</head>
+<body>
+  <h1>Impostazioni</h1>
+
+  <section>
+    <h2>Provider attivi</h2>
+    <label class="checkbox-row"><input type="checkbox" id="active-claude" /><span class="checkbox-box"><svg class="check-icon" width="12" height="10" viewBox="0 0 24 20" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M2,10 L9,17 L22,3"></path></svg></span>Claude</label>
+    <label class="checkbox-row"><input type="checkbox" id="active-codex" /><span class="checkbox-box"><svg class="check-icon" width="12" height="10" viewBox="0 0 24 20" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M2,10 L9,17 L22,3"></path></svg></span>Codex</label>
+    <label class="checkbox-row"><input type="checkbox" id="active-copilot" /><span class="checkbox-box"><svg class="check-icon" width="12" height="10" viewBox="0 0 24 20" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M2,10 L9,17 L22,3"></path></svg></span>Copilot</label>
+    <label class="checkbox-row"><input type="checkbox" id="active-gemini" /><span class="checkbox-box"><svg class="check-icon" width="12" height="10" viewBox="0 0 24 20" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M2,10 L9,17 L22,3"></path></svg></span>Gemini</label>
+  </section>
+
+  <section>
+    <h2>Refresh</h2>
+    <label class="row">Intervallo (secondi)
+      <input type="number" id="refresh-interval" min="30" step="10" />
+    </label>
+  </section>
+
+  <section>
+    <h2>Allerta</h2>
+    <label class="row">Soglia (%)
+      <input type="number" id="alert-threshold" min="1" max="100" />
+    </label>
+  </section>
+
+  <section>
+    <h2>Visibilità della pill</h2>
+    <label class="row">Modalità
+      <select id="pill-visibility-mode">
+        <option value="always">Sempre visibile</option>
+        <option value="auto_collapse">Auto-collapse</option>
+      </select>
+    </label>
+    <label class="row" id="pill-collapse-delay-row">Collassa dopo (secondi)
+      <input type="number" id="pill-collapse-delay" min="1" step="1" />
+    </label>
+  </section>
+
+  <section>
+    <h2>Sistema</h2>
+    <label class="checkbox-row"><input type="checkbox" id="autostart" /><span class="checkbox-box"><svg class="check-icon" width="12" height="10" viewBox="0 0 24 20" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M2,10 L9,17 L22,3"></path></svg></span>Avvia al login</label>
+  </section>
+
+  <div class="actions">
+    <button id="save-btn">Salva</button>
+    <span class="hint" id="hint" hidden>Salvato — riavvia l'app per applicare provider/intervallo.</span>
+  </div>
+
+<script src="settings.js"></script>
+</body>
+</html>

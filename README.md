@@ -1,95 +1,107 @@
 # AI Usage Notch
 
 Widget flottante sempre visibile in cima allo schermo che mostra il consumo
-di Claude e Codex, letto dalle credenziali locali di `claude` (Claude Code CLI)
-e `codex` (Codex CLI) — nessuna API key da configurare a mano.
+di **Claude**, **Codex** e **GitHub Copilot**, letto dalle credenziali
+locali già presenti sulla macchina (Keychain per Claude su macOS, file di
+credenziali per Codex, `gh auth token` per Copilot) — nessuna API key da
+configurare a mano.
 
-Costruito con **Tauri v2** (Rust + webview di sistema, niente Node/npm richiesto
-per il frontend, che è HTML/CSS/JS statico). Pensato per essere portato su
-macOS in un secondo momento — vedi in fondo.
+Costruito con **Tauri v2** (Rust + webview di sistema, niente Node/npm
+richiesto per il frontend, che è HTML/CSS/JS statico).
 
-## Prerequisiti (Windows)
+## Prerequisiti
 
-1. [Rust](https://rustup.rs) (`rustup-init.exe`, poi riavvia il terminale)
-2. [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/)
-   con il carico di lavoro "Sviluppo di applicazioni desktop con C++"
-   (richiesto dal linker MSVC — se hai già Visual Studio con quel workload, salta)
-3. [WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/)
-   — su Windows 10/11 recenti è già preinstallato
-4. Tauri CLI: `cargo install tauri-cli --version "^2"`
-5. Claude Code CLI già loggato (`claude login`) e/o Codex CLI già loggato
-   (`codex login`) — il widget legge i loro file di credenziali locali
+1. [Rust](https://rustup.rs)
+2. Tauri CLI: `cargo install tauri-cli --version "^2"`
+3. Solo Windows: [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/)
+   (workload "Sviluppo di applicazioni desktop con C++", richiesto dal
+   linker MSVC) e [WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/)
+   (già preinstallato su Windows 10/11 recenti)
+4. Almeno uno tra: Claude Code CLI loggato (`claude login`), Codex CLI
+   loggato (`codex login`), GitHub CLI loggato (`gh auth login`) — il widget
+   legge le credenziali che trova, un provider non configurato appare grigio
+   invece di rompere l'interfaccia (vedi "Comportamento" sotto)
 
 ## Avvio in sviluppo
 
-```powershell
+```sh
 cd ai-usage-notch
 cargo tauri dev
 ```
 
-La prima compilazione scarica ed è più lenta (qualche minuto); le successive
-sono incrementali.
-
 ## Build eseguibile
 
-```powershell
+```sh
 cargo tauri build
 ```
 
-Produce un installer `.exe` (NSIS) in `target/release/bundle/nsis/`.
+- Windows: installer `.exe` (NSIS) in `target/release/bundle/nsis/`
+- macOS: `.app` in `target/release/bundle/macos/` e `.dmg` in `target/release/bundle/dmg/`
 
-## ⚠️ La parte da verificare al primo avvio
+## Comportamento
 
-Claude e Codex non pubblicano un'API ufficiale per leggere la percentuale di
-utilizzo del proprio abbonamento — questo widget usa gli stessi due endpoint
-non documentati che usano internamente le rispettive CLI (`/usage` in Claude
-Code, `/status` in Codex):
-
-- Claude: `GET https://api.anthropic.com/api/oauth/usage`, autenticato col
-  token OAuth che `claude login` salva in `%USERPROFILE%\.claude\.credentials.json`
-- Codex: `GET https://chatgpt.com/backend-api/wham/usage`, autenticato con
-  `access_token` + `account_id` da `%USERPROFILE%\.codex\auth.json`
-
-Il **nome dei campi nella risposta JSON** (`five_hour`, `seven_day`,
-`utilization`, `resets_in_seconds` per Claude; `rate_limits.primary/secondary`,
-`used_percent` per Codex) è la mia migliore stima in base a tool community
-equivalenti, ma non l'ho potuto verificare contro una risposta reale. Se al
-primo avvio i pallini restano su "—" o "!":
-
-1. Lancia `cargo tauri dev` (build di debug: stampa il JSON grezzo su stderr)
-2. Guarda la console per le righe `[claude usage raw]` / `[codex usage raw]`
-3. Aggiorna i nomi dei campi in `src/main.rs` (funzioni `get_claude_usage` /
-   `get_codex_usage`) di conseguenza — sono isolati in poche righe
-
-Questi endpoint possono anche cambiare in futuro senza preavviso: se smettono
-di funzionare del tutto, lo stesso approccio (leggere il token locale +
-richiamare l'endpoint di stato) resta valido, va solo riverificato.
-
-I token restano sempre e solo in locale (letti dal filesystem, mai loggati
-salvo la stampa di debug sopra, mai inviati altrove che ai due endpoint
-ufficiali di Anthropic/OpenAI).
+- **Click sinistro** su un anello: apre/chiude il dettaglio di quel provider
+  (finestre di utilizzo, reset, eventuale badge overage).
+- **Click destro** sulla pill: forza un refresh immediato di tutti i
+  provider, bypassando il backoff.
+- **Doppio click** sullo sfondo della pill (non su un anello): alterna
+  modalità estesa/compatta (solo anelli, percentuale all'hover).
+- **Trascinamento**: la pill si sposta e ricorda la posizione tra un riavvio
+  e l'altro.
+- **Icona ingranaggio**: apre la finestra impostazioni (provider attivi,
+  intervallo di refresh, soglia di allerta, avvio al login).
+- Un provider senza credenziali configurate appare **grigio** con un
+  tooltip esplicativo invece di un anello rotto; un provider che ha
+  funzionato e poi ha iniziato a fallire mostra invece un allarme rosso.
+- Sopra la soglia di allerta (80% di default) l'anello pulsa e arriva una
+  notifica di sistema, una sola volta per ciclo (fino al prossimo reset
+  della finestra).
 
 ## Struttura
 
 ```
-src/main.rs          logica Rust: lettura credenziali + chiamate HTTP
-dist/                frontend statico (nessuna build step)
-tauri.conf.json       finestra trasparente, senza bordi, sempre in primo piano
-capabilities/          permessi minimi (resize/posizione finestra)
-icons/                 icona placeholder generica — sostituiscila quando vuoi
+src/main.rs           comandi Tauri, setup finestra, posizionamento notch
+src/providers/         un modulo per provider (claude/codex/copilot), trait UsageProvider comune
+src/credentials.rs      risoluzione token per piattaforma (Keychain/file/gh)
+src/cache.rs            ultimo dato valido su disco, mostrato subito all'avvio
+src/settings.rs         provider attivi, intervallo refresh, soglia, posizione finestra
+src/notch.rs            posizionamento accanto alla notch fisica su macOS (via objc2-app-kit)
+dist/                   frontend statico (pill + pannello dettagli + finestra impostazioni)
+tauri.conf.json         due finestre: pill trasparente sempre in primo piano + impostazioni
+capabilities/           permessi minimi (resize/posizione finestra, notifiche, autostart)
+docs/endpoints.md        shape reali degli endpoint non ufficiali, verificate con dati veri
+fixtures/                risposte reali salvate, usate dai test (nessuna rete nei test)
+scripts/probe.*          script per riverificare a mano gli endpoint se smettono di funzionare
 ```
 
-## Verso il porting su macOS
+## Se un endpoint cambia
 
-L'app è già pensata cross-platform (Rust + Tauri girano nativamente anche su
-macOS). Per il porting:
+Claude, Codex e Copilot non pubblicano API ufficiali per la percentuale di
+utilizzo — questo widget usa gli stessi endpoint non documentati delle
+rispettive CLI/estensioni. Se un provider inizia a mostrare l'errore
+"risposta ricevuta ma nessun campo riconosciuto":
 
-- aggiungi `"app"` e `"dmg"` a `bundle.targets` in `tauri.conf.json`
-- genera l'icona `.icns` mancante — con Tauri CLI installato:
-  `cargo tauri icon icons/icon.png` rigenera l'intero set per tutte le piattaforme
-- il posizionamento "in cima allo schermo" nel `setup()` di `main.rs` va bene
-  così com'è (usa le API cross-platform di Tauri), ma su macOS con notch fisico
-  potresti voler agganciare il widget accanto alla notch reale invece che al
-  centro — è un piccolo aggiustamento di `x`/`y`
-- `~/.claude/.credentials.json` e `~/.codex/auth.json` sono gli stessi path
-  relativi su macOS (cambia solo la home directory, già gestita da `dirs::home_dir()`)
+1. Rilancia `scripts/probe.sh` (o `.ps1` su Windows) per catturare una
+   risposta reale aggiornata
+2. Confrontala con `docs/endpoints.md`
+3. Aggiorna il parsing nel modulo del provider interessato sotto
+   `src/providers/`
+
+I token restano sempre e solo in locale; in build di debug il body grezzo
+della risposta viene stampato su stderr per diagnosticare, mai altrove.
+
+## Distribuzione — installer Windows non firmato
+
+L'installer NSIS prodotto da `cargo tauri build` **non è firmato digitalmente**:
+Windows SmartScreen mostrerà un avviso ("Windows ha protetto il PC") al primo
+avvio. La firma del codice richiede un certificato a pagamento (rinnovo
+annuale) che non ha senso per un progetto a uso personale — l'avviso va
+accettato consapevolmente ("Ulteriori informazioni" → "Esegui comunque"),
+non è un segnale di un problema nel software. Da rivalutare solo se questo
+progetto smettesse di essere per uso personale.
+
+## Nota — Mac App Store
+
+`transparent: true` su macOS richiede la feature `macos-private-api`, già
+abilitata: questo esclude la distribuzione via Mac App Store. Irrilevante
+per uso personale.
