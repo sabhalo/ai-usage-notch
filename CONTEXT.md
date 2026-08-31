@@ -1,6 +1,6 @@
 # AI Usage Notch
 
-A menu-bar-adjacent Tauri app that shows live usage percentages for several AI provider accounts (Claude, Codex, Copilot, Gemini) in a small floating pill, with a per-provider detail view on demand.
+A menu-bar-adjacent Tauri app that shows live usage percentages for several AI provider accounts (Claude, Codex, Copilot) in a small floating pill, with a per-provider detail view on demand.
 
 ## Language
 

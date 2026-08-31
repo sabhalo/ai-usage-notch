@@ -40,7 +40,12 @@ fn oauth_access_token(json: &serde_json::Value) -> Option<String> {
 #[cfg(target_os = "macos")]
 pub fn claude_token() -> Result<String, ProviderError> {
     let output = std::process::Command::new("security")
-        .args(["find-generic-password", "-s", "Claude Code-credentials", "-w"])
+        .args([
+            "find-generic-password",
+            "-s",
+            "Claude Code-credentials",
+            "-w",
+        ])
         .output()
         .map_err(|e| ProviderError::NotLoggedIn(format!("impossibile eseguire 'security': {e}")))?;
 
@@ -64,7 +69,9 @@ pub fn claude_token() -> Result<String, ProviderError> {
     } else if !raw.is_empty() {
         Ok(raw)
     } else {
-        Err(ProviderError::NotLoggedIn("Token OAuth vuoto in Keychain".to_string()))
+        Err(ProviderError::NotLoggedIn(
+            "Token OAuth vuoto in Keychain".to_string(),
+        ))
     }
 }
 
@@ -136,7 +143,10 @@ pub fn copilot_token() -> Result<String, ProviderError> {
     // assoluti noti. Niente `.env("PATH", ...)`: su Unix non è garantito che
     // influenzi la risoluzione del nome del programma passato a Command::new.
     for candidate in ["gh", "/opt/homebrew/bin/gh", "/usr/local/bin/gh"] {
-        if let Ok(out) = std::process::Command::new(candidate).args(["auth", "token"]).output() {
+        if let Ok(out) = std::process::Command::new(candidate)
+            .args(["auth", "token"])
+            .output()
+        {
             if out.status.success() {
                 let t = String::from_utf8_lossy(&out.stdout).trim().to_string();
                 if !t.is_empty() {
@@ -165,7 +175,10 @@ mod tests {
     #[test]
     fn valid_token_is_extracted() {
         let json = serde_json::json!({"claudeAiOauth": {"accessToken": "sk-ant-oat01-real"}});
-        assert_eq!(oauth_access_token(&json), Some("sk-ant-oat01-real".to_string()));
+        assert_eq!(
+            oauth_access_token(&json),
+            Some("sk-ant-oat01-real".to_string())
+        );
     }
 
     #[test]
