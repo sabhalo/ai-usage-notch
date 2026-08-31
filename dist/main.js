@@ -17,6 +17,10 @@ const PILL_HEIGHT_VISIBLE = 46;
 const PILL_HEIGHT_COLLAPSED = 34;
 const PANEL_EXTRA_HEIGHT = 150; // deve restare coerente con .detail nel CSS
 
+// Unica fonte per l'elenco provider: state/everSucceeded/backoff/activeProviders
+// (issue #7) erano quattro liste hardcoded da tenere allineate a mano, un
+// rischio già con tre provider e peggiore con quattro.
+const PROVIDER_IDS = ["claude", "codex", "copilot", "gemini"];
 const PROVIDER_TITLES = { claude: "Claude", codex: "Codex", copilot: "Copilot", gemini: "Gemini" };
 const UNLIMITED_COLOR = "#8b5cf6"; // viola: distinto dalla scala verde/ambra/rosso, "non applicabile"
 const ERROR_COLOR = "#ef4444";
@@ -29,18 +33,12 @@ const RING_IDS = {
   gemini: { pctElId: "gemini-pct", ringFgId: "gemini-ring-fg", btnId: "gemini-btn" },
 };
 
-// Gemini è solo il guscio visivo (issue #4): niente backend Rust ancora, quindi
-// resta fuori da state/everSucceeded/backoff così tick() non lo interroga.
-const state = { claude: null, codex: null, copilot: null };
+const state = Object.fromEntries(PROVIDER_IDS.map((p) => [p, null]));
 // true solo dopo la prima fetch riuscita: distingue "non ancora configurato"
 // (grigio, mai partito) da "ha funzionato e ora fallisce" (rosso, allarme
 // vero) — vedi plan/step-3.5.md.
-const everSucceeded = { claude: false, codex: false, copilot: false };
-const backoff = {
-  claude: { failures: 0, nextAt: 0 },
-  codex: { failures: 0, nextAt: 0 },
-  copilot: { failures: 0, nextAt: 0 },
-};
+const everSucceeded = Object.fromEntries(PROVIDER_IDS.map((p) => [p, false]));
+const backoff = Object.fromEntries(PROVIDER_IDS.map((p) => [p, { failures: 0, nextAt: 0 }]));
 // Per il pulsare sopra soglia (step-4.3.md): ultima percentuale vista (per
 // riconoscere un reset di finestra: pct che scende) e se è già partita una
 // notifica per il ciclo corrente.
@@ -48,7 +46,7 @@ const lastPct = {};
 const notifiedThisCycle = {};
 
 let openProvider = null;
-let activeProviders = { claude: true, codex: true, copilot: true };
+let activeProviders = Object.fromEntries(PROVIDER_IDS.map((p) => [p, true]));
 let alertThresholdPct = 80;
 let panelCloseTimer = null;
 
@@ -175,7 +173,7 @@ async function loadRuntimeSettings() {
   try {
     const s = await invoke("get_settings");
     alertThresholdPct = s.alert_threshold_pct;
-    activeProviders = { claude: true, codex: true, copilot: true, ...s.active_providers };
+    activeProviders = { ...activeProviders, ...s.active_providers };
     refreshMs = Math.max(30, s.refresh_interval_s) * 1000;
     pillVisibilityMode = s.pill_visibility_mode || "always";
     pillCollapseDelayMs = Math.max(1, s.pill_collapse_delay_s || 3) * 1000;
@@ -385,6 +383,9 @@ document
   .getElementById("copilot-btn")
   .addEventListener("click", () => toggleProvider("copilot"));
 document
+  .getElementById("gemini-btn")
+  .addEventListener("click", () => toggleProvider("gemini"));
+document
   .getElementById("settings-btn")
   .addEventListener("click", (e) => {
     e.stopPropagation();
@@ -449,8 +450,6 @@ async function refreshVisibilitySettings() {
 }
 
 async function boot() {
-  setRingColor(document.getElementById(RING_IDS.gemini.ringFgId), NOT_CONFIGURED_COLOR, 100);
-  document.getElementById(RING_IDS.gemini.pctElId).textContent = "–";
   await loadRuntimeSettings();
   await loadCachedUsage();
   await tick(true); // il primo giro è sempre forzato, non aspetta il primo tick

@@ -12,7 +12,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 
 fn default_active_providers() -> HashMap<String, bool> {
-    ["claude", "codex", "copilot"]
+    ["claude", "codex", "copilot", "gemini"]
         .into_iter()
         .map(|p| (p.to_string(), true))
         .collect()

@@ -60,3 +60,50 @@ Token ottenuto con `gh auth token` — ha funzionato nonostante gli scope del
 token (`admin:public_key, gist, read:org, repo`) non includano `user`; lo
 scope minimo per questo endpoint non è quindi `user` come ipotizzato in Fase
 2.1. Non serve il fallback `gh auth refresh -s user` in questo caso.
+
+## Gemini — `POST http://127.0.0.1:<porta>/exa.language_server_pb.LanguageServerService/RetrieveUserQuotaSummary`
+
+**Verificato**, risposta reale (nomi/email rimossi, non presenti in questo
+endpoint) in [`fixtures/gemini-usage.json`](../fixtures/gemini-usage.json).
+
+Non è un endpoint remoto: vive solo dentro un processo `agy` (Antigravity
+CLI) già in esecuzione, su una porta TCP loopback effimera scelta a ogni
+sessione. `agy` **non** è un demone — `agy --print "..."` apre ed esce dal
+language server nello stesso comando; solo una sessione interattiva
+(`agy`, richiede un TTY reale: verificato che fallisce con
+`bubbletea: could not open TTY` sotto redirezione pipe) lo tiene su per
+tutta la sua durata. Il notch non avvia/gestisce `agy`: si limita a
+scoprire una sessione già in corso con `pgrep -x agy` +
+`lsof -nP -a -p <pid> -iTCP -sTCP:LISTEN`, e prova ogni porta trovata
+finché una risponde (ogni sessione apre due porte, una HTTPS e una HTTP in
+chiaro — solo la seconda serve l'RPC).
+
+**Nessun token richiesto.** Ipotesi originale (Bearer da Keychain/file,
+come per gli altri tre) **falsificata**: la chiamata POST funziona senza
+alcun header di autenticazione — fiducia implicita sul loopback, non un
+bearer token applicativo. `src/credentials.rs` non ha quindi bisogno di
+alcuna funzione per Gemini.
+
+Shape reale:
+
+```
+response.groups[].displayName            (stringa, es. "Gemini Models")
+response.groups[].buckets[].bucketId      (stringa: "gemini-weekly" | "3p-weekly")
+response.groups[].buckets[].remainingFraction  (float, 0-1)
+response.groups[].buckets[].resetTime     (stringa ISO 8601 UTC)
+```
+
+Due gruppi, quota settimanale condivisa all'interno di ciascuno: `gemini-weekly`
+copre tutti i modelli Gemini (guida l'anello, `windows[0]`), `3p-weekly`
+copre Claude e GPT-OSS instradati via Antigravity (informativo, solo nel
+pannello dettaglio). L'endpoint alternativo `GetUserStatus` espone lo stesso
+dato ripetuto per ogni modello nel piano (14 voci per questo account, tutte
+con lo stesso `remainingFraction` all'interno del loro gruppo) — usato per
+la sola perlustrazione, `RetrieveUserQuotaSummary` è la fonte scelta perché
+già aggregata per gruppo e senza dati personali nel corpo della risposta.
+
+Se nessuna sessione `agy` è attiva: `ProviderError::NotLoggedIn`, distinto
+da `UsageWindow.unlimited` (mai `true` per questo provider — la quota
+Gemini/Antigravity non è mai illimitata, "non misurabile" e "illimitato"
+restano quindi già separati dai due meccanismi esistenti, nessun nuovo
+stato UI necessario).
