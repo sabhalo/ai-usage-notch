@@ -8,13 +8,20 @@ let refreshMs = 300_000; // intervallo normale a provider sano; sovrascritto da 
 const TICK_MS = 30_000; // granularità del loop di controllo backoff (= primo gradino)
 const BACKOFF_STEPS_S = [30, 300, 900]; // 30s -> 5min -> 15min (cap), per provider
 const CACHE_STALE_MS = 10 * 60 * 1000;
-const AUTO_COLLAPSE_MS = 7000; // plan/step-4.4.md: un solo posto per questo numero
-const EXTENDED_WIDTH = 300; // 220 bastava per 2 anelli, con Copilot serve più spazio (step-2.5)
-const COMPACT_WIDTH = 170; // solo anelli, percentuale all'hover (step-4.2)
-const COLLAPSED_HEIGHT = 46;
-const EXPANDED_EXTRA_HEIGHT = 150; // deve restare coerente con .detail nel CSS
+// Due timer distinti che collassavano sotto lo stesso nome prima di issue #8:
+// questo chiude il Panel (dettaglio provider) dopo inattività.
+const PANEL_AUTO_CLOSE_MS = 7000;
+const EXTENDED_WIDTH = 360; // 300 bastava per 3 anelli, con Gemini (4°) serve più spazio (issue #4)
+const PILL_WIDTH_COLLAPSED = 130; // solo anelli miniaturizzati, niente percentuale (issue #8)
+const PILL_HEIGHT_VISIBLE = 46;
+const PILL_HEIGHT_COLLAPSED = 34;
+const PANEL_EXTRA_HEIGHT = 150; // deve restare coerente con .detail nel CSS
 
-const PROVIDER_TITLES = { claude: "Claude", codex: "Codex", copilot: "Copilot" };
+// Unica fonte per l'elenco provider: state/everSucceeded/backoff/activeProviders
+// (issue #7) erano quattro liste hardcoded da tenere allineate a mano, un
+// rischio già con tre provider e peggiore con quattro.
+const PROVIDER_IDS = ["claude", "codex", "copilot", "gemini"];
+const PROVIDER_TITLES = { claude: "Claude", codex: "Codex", copilot: "Copilot", gemini: "Gemini" };
 const UNLIMITED_COLOR = "#8b5cf6"; // viola: distinto dalla scala verde/ambra/rosso, "non applicabile"
 const ERROR_COLOR = "#ef4444";
 const NOT_CONFIGURED_COLOR = "rgba(255, 255, 255, 0.2)";
@@ -23,18 +30,15 @@ const RING_IDS = {
   claude: { pctElId: "claude-pct", ringFgId: "claude-ring-fg", btnId: "claude-btn" },
   codex: { pctElId: "codex-pct", ringFgId: "codex-ring-fg", btnId: "codex-btn" },
   copilot: { pctElId: "copilot-pct", ringFgId: "copilot-ring-fg", btnId: "copilot-btn" },
+  gemini: { pctElId: "gemini-pct", ringFgId: "gemini-ring-fg", btnId: "gemini-btn" },
 };
 
-const state = { claude: null, codex: null, copilot: null };
+const state = Object.fromEntries(PROVIDER_IDS.map((p) => [p, null]));
 // true solo dopo la prima fetch riuscita: distingue "non ancora configurato"
 // (grigio, mai partito) da "ha funzionato e ora fallisce" (rosso, allarme
 // vero) — vedi plan/step-3.5.md.
-const everSucceeded = { claude: false, codex: false, copilot: false };
-const backoff = {
-  claude: { failures: 0, nextAt: 0 },
-  codex: { failures: 0, nextAt: 0 },
-  copilot: { failures: 0, nextAt: 0 },
-};
+const everSucceeded = Object.fromEntries(PROVIDER_IDS.map((p) => [p, false]));
+const backoff = Object.fromEntries(PROVIDER_IDS.map((p) => [p, { failures: 0, nextAt: 0 }]));
 // Per il pulsare sopra soglia (step-4.3.md): ultima percentuale vista (per
 // riconoscere un reset di finestra: pct che scende) e se è già partita una
 // notifica per il ciclo corrente.
@@ -42,10 +46,17 @@ const lastPct = {};
 const notifiedThisCycle = {};
 
 let openProvider = null;
-let compactMode = false;
-let activeProviders = { claude: true, codex: true, copilot: true };
+let activeProviders = Object.fromEntries(PROVIDER_IDS.map((p) => [p, true]));
 let alertThresholdPct = 80;
-let collapseTimer = null;
+let panelCloseTimer = null;
+
+// Visibilità della Pill (issue #8): "always" la tiene sempre Visible,
+// "auto_collapse" la fa Collassare dopo pillCollapseDelayMs di inattività.
+// Vedi CONTEXT.md per i termini Visible/Collapsed/Panel.
+let pillVisibilityMode = "always";
+let pillCollapseDelayMs = 3000;
+let pillCollapsed = false;
+let pillCollapseTimer = null;
 
 function pctColor(p) {
   if (p >= 90) return "#ef4444";
@@ -162,8 +173,10 @@ async function loadRuntimeSettings() {
   try {
     const s = await invoke("get_settings");
     alertThresholdPct = s.alert_threshold_pct;
-    activeProviders = { claude: true, codex: true, copilot: true, ...s.active_providers };
+    activeProviders = { ...activeProviders, ...s.active_providers };
     refreshMs = Math.max(30, s.refresh_interval_s) * 1000;
+    pillVisibilityMode = s.pill_visibility_mode || "always";
+    pillCollapseDelayMs = Math.max(1, s.pill_collapse_delay_s || 3) * 1000;
   } catch (e) {
     console.warn("impostazioni non disponibili, uso i default:", e);
   }
@@ -279,15 +292,22 @@ function renderDetail(provider) {
   }
 }
 
-function currentCollapsedWidth() {
-  return compactMode ? COMPACT_WIDTH : EXTENDED_WIDTH;
-}
+// Unico punto che traduce i due assi indipendenti (Panel open/closed, Pill
+// visible/collapsed — vedi CONTEXT.md) in dimensioni reali della finestra.
+// Il Panel aperto forza sempre la Pill Visible: non esiste uno stato
+// Collapsed+Panel aperto.
+async function applyLayout() {
+  const panelOpen = !!openProvider;
+  const collapsed = pillCollapsed && !panelOpen;
+  document.getElementById("detail").hidden = !panelOpen;
+  document.querySelector(".pill").classList.toggle("pill-collapsed", collapsed);
 
-async function setExpanded(expanded) {
-  const detail = document.getElementById("detail");
-  detail.hidden = !expanded;
-  const width = expanded ? EXTENDED_WIDTH : currentCollapsedWidth();
-  const h = expanded ? COLLAPSED_HEIGHT + EXPANDED_EXTRA_HEIGHT : COLLAPSED_HEIGHT;
+  const width = collapsed ? PILL_WIDTH_COLLAPSED : EXTENDED_WIDTH;
+  const h = panelOpen
+    ? PILL_HEIGHT_VISIBLE + PANEL_EXTRA_HEIGHT
+    : collapsed
+    ? PILL_HEIGHT_COLLAPSED
+    : PILL_HEIGHT_VISIBLE;
   try {
     await win.setSize(new LogicalSize(width, h));
   } catch (e) {
@@ -297,32 +317,48 @@ async function setExpanded(expanded) {
   }
 }
 
-function scheduleAutoCollapse() {
-  clearTimeout(collapseTimer);
+function schedulePanelAutoClose() {
+  clearTimeout(panelCloseTimer);
   if (!openProvider) return;
-  collapseTimer = setTimeout(() => {
+  panelCloseTimer = setTimeout(() => {
     openProvider = null;
-    setExpanded(false);
-  }, AUTO_COLLAPSE_MS);
+    applyLayout();
+    schedulePillCollapse();
+  }, PANEL_AUTO_CLOSE_MS);
+}
+
+// Sospeso mentre il Panel è aperto (issue #8, punto 4): niente collasso della
+// Pill sotto un dettaglio che l'utente sta guardando.
+function schedulePillCollapse() {
+  clearTimeout(pillCollapseTimer);
+  if (pillVisibilityMode !== "auto_collapse" || openProvider) return;
+  pillCollapseTimer = setTimeout(() => {
+    pillCollapsed = true;
+    applyLayout();
+  }, pillCollapseDelayMs);
+}
+
+function wakePill() {
+  if (pillCollapsed) {
+    pillCollapsed = false;
+    applyLayout();
+  }
+  schedulePillCollapse();
 }
 
 function toggleProvider(provider) {
   if (openProvider === provider) {
     openProvider = null;
-    clearTimeout(collapseTimer);
-    setExpanded(false);
+    clearTimeout(panelCloseTimer);
+    applyLayout();
+    schedulePillCollapse();
     return;
   }
   openProvider = provider;
   renderDetail(provider);
-  setExpanded(true);
-  scheduleAutoCollapse();
-}
-
-function toggleCompact() {
-  compactMode = !compactMode;
-  document.querySelector(".pill").classList.toggle("compact", compactMode);
-  if (!openProvider) setExpanded(false);
+  clearTimeout(pillCollapseTimer);
+  applyLayout();
+  schedulePanelAutoClose();
 }
 
 async function openSettingsWindow() {
@@ -347,19 +383,23 @@ document
   .getElementById("copilot-btn")
   .addEventListener("click", () => toggleProvider("copilot"));
 document
+  .getElementById("gemini-btn")
+  .addEventListener("click", () => toggleProvider("gemini"));
+document
   .getElementById("settings-btn")
   .addEventListener("click", (e) => {
     e.stopPropagation();
     openSettingsWindow();
   });
 
-document.getElementById("detail").addEventListener("pointermove", scheduleAutoCollapse);
-document.getElementById("detail").addEventListener("click", scheduleAutoCollapse);
+document.getElementById("detail").addEventListener("pointermove", schedulePanelAutoClose);
+document.getElementById("detail").addEventListener("click", schedulePanelAutoClose);
 win.onFocusChanged(({ payload: focused }) => {
   if (!focused && openProvider) {
     openProvider = null;
-    clearTimeout(collapseTimer);
-    setExpanded(false);
+    clearTimeout(panelCloseTimer);
+    applyLayout();
+    schedulePillCollapse();
   }
 });
 
@@ -373,12 +413,10 @@ pillEl.addEventListener("contextmenu", (e) => {
   forceRefreshNow();
 });
 
-// Doppio click sullo sfondo della pill (non su un pulsante provider) passa
-// tra modalità estesa e compatta (plan/step-4.2.md).
-pillEl.addEventListener("dblclick", (e) => {
-  if (e.target.closest(".provider")) return;
-  toggleCompact();
-});
+// Sveglia la Pill (torna Visible) al passaggio del mouse; se la modalità è
+// "auto_collapse" riarma anche il timer di collasso (issue #8).
+pillEl.addEventListener("mouseenter", wakePill);
+pillEl.addEventListener("pointermove", wakePill);
 
 // Trascinamento nativo via data-tauri-drag-region sulla pill (index.html);
 // qui persistiamo solo la posizione finale, con un debounce per non scrivere
@@ -393,11 +431,33 @@ win.onMoved(({ payload }) => {
   }, 400);
 });
 
+// La modalità di visibilità va commutabile dalle impostazioni senza
+// riavviare (issue #8): riletta a ogni tick invece di un canale di eventi
+// dedicato, riusando il polling che il resto dell'app già fa ogni TICK_MS.
+async function refreshVisibilitySettings() {
+  const prevMode = pillVisibilityMode;
+  await loadRuntimeSettings();
+  if (pillVisibilityMode === prevMode) return;
+  if (pillVisibilityMode !== "auto_collapse") {
+    clearTimeout(pillCollapseTimer);
+    if (pillCollapsed) {
+      pillCollapsed = false;
+      applyLayout();
+    }
+  } else {
+    schedulePillCollapse();
+  }
+}
+
 async function boot() {
   await loadRuntimeSettings();
   await loadCachedUsage();
   await tick(true); // il primo giro è sempre forzato, non aspetta il primo tick
-  setInterval(() => tick(false), TICK_MS);
+  setInterval(() => {
+    refreshVisibilitySettings();
+    tick(false);
+  }, TICK_MS);
+  schedulePillCollapse();
 }
 
 boot();

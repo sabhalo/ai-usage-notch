@@ -88,20 +88,34 @@ html, body {
   background: rgba(255, 255, 255, 0.08);
 }
 
-/* Modalità compatta (step-4.2.md): solo anelli, la percentuale appare
-   all'hover invece di occupare spazio fisso sempre. */
-.pill.compact .provider .pct {
-  opacity: 0;
-  width: 0;
-  min-width: 0;
-  overflow: hidden;
-  transition: opacity 0.15s ease, width 0.15s ease;
+/* Pill Collapsed (issue #8, CONTEXT.md): anelli miniaturizzati, niente
+   percentuale né divisori — solo lo stato a colpo d'occhio. Sveglia al
+   passaggio del mouse (main.js: wakePill). */
+.pill.pill-collapsed {
+  height: 34px;
+  padding: 0 8px;
+  gap: 3px;
 }
 
-.pill.compact .provider:hover .pct {
-  opacity: 1;
-  width: 30px;
-  min-width: 30px;
+.pill.pill-collapsed .settings-btn,
+.pill.pill-collapsed .divider,
+.pill.pill-collapsed .pct {
+  display: none;
+}
+
+.pill.pill-collapsed .provider {
+  padding: 2px 3px;
+  gap: 0;
+}
+
+.pill.pill-collapsed .ring {
+  width: 16px;
+  height: 16px;
+}
+
+.pill.pill-collapsed .icon {
+  width: 10px;
+  height: 10px;
 }
 
 .divider {
@@ -141,8 +155,8 @@ html, body {
 
 .icon {
   position: relative;
-  font-size: 10px;
-  color: #f2f2f4;
+  width: 14px;
+  height: 14px;
 }
 
 .pct {
@@ -154,7 +168,7 @@ html, body {
 }
 
 .detail {
-  width: 300px;
+  width: 360px;
   margin-top: 6px;
   background: #121214;
   border-radius: 14px;

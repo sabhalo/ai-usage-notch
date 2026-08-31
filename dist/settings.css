@@ -40,7 +40,8 @@ label.row {
   justify-content: space-between;
 }
 
-input[type="number"] {
+input[type="number"],
+select {
   width: 70px;
   background: #121214;
   border: 1px solid rgba(255, 255, 255, 0.15);
@@ -48,6 +49,10 @@ input[type="number"] {
   color: #f2f2f4;
   padding: 4px 6px;
   font-size: 13px;
+}
+
+select {
+  width: auto;
 }
 
 .actions {

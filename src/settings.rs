@@ -12,7 +12,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 
 fn default_active_providers() -> HashMap<String, bool> {
-    ["claude", "codex", "copilot"]
+    ["claude", "codex", "copilot", "gemini"]
         .into_iter()
         .map(|p| (p.to_string(), true))
         .collect()
@@ -26,6 +26,16 @@ fn default_alert_threshold_pct() -> f64 {
     80.0
 }
 
+// "always" | "auto_collapse" — vedi issue #8. La pill non collassa mai finché
+// l'utente non lo sceglie esplicitamente nelle impostazioni.
+fn default_pill_visibility_mode() -> String {
+    "always".to_string()
+}
+
+fn default_pill_collapse_delay_s() -> u64 {
+    3
+}
+
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Settings {
     #[serde(default)]
@@ -36,6 +46,10 @@ pub struct Settings {
     pub refresh_interval_s: u64,
     #[serde(default = "default_alert_threshold_pct")]
     pub alert_threshold_pct: f64,
+    #[serde(default = "default_pill_visibility_mode")]
+    pub pill_visibility_mode: String,
+    #[serde(default = "default_pill_collapse_delay_s")]
+    pub pill_collapse_delay_s: u64,
 }
 
 impl Default for Settings {
@@ -45,6 +59,8 @@ impl Default for Settings {
             active_providers: default_active_providers(),
             refresh_interval_s: default_refresh_interval_s(),
             alert_threshold_pct: default_alert_threshold_pct(),
+            pill_visibility_mode: default_pill_visibility_mode(),
+            pill_collapse_delay_s: default_pill_collapse_delay_s(),
         }
     }
 }

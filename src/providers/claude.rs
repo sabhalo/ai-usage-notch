@@ -1,4 +1,4 @@
-use super::{ProviderError, UsageProvider, UsageResult, UsageWindow, fmt_reset, too_many_requests, FetchError};
+use super::{ProviderError, UsageProvider, UsageResult, UsageWindow, resets_in_from_iso, too_many_requests, FetchError};
 use crate::credentials;
 
 /// Shape della risposta verificata su dati reali, vedi
@@ -51,43 +51,6 @@ impl UsageProvider for ClaudeProvider {
 
         parse_claude_usage(&body).map_err(Into::into)
     }
-}
-
-/// Converte una data ISO 8601 UTC ("2026-08-28T15:19:59.85+00:00") in secondi
-/// dall'epoch, senza dipendenze esterne (algoritmo civile di Howard Hinnant).
-fn parse_iso_utc_epoch(s: &str) -> Option<i64> {
-    let s = s.get(0..19)?; // "YYYY-MM-DDTHH:MM:SS", ignora frazioni/offset
-    let (date, time) = s.split_once('T')?;
-    let mut d = date.split('-');
-    let y: i64 = d.next()?.parse().ok()?;
-    let m: i64 = d.next()?.parse().ok()?;
-    let day: i64 = d.next()?.parse().ok()?;
-    let mut t = time.split(':');
-    let h: i64 = t.next()?.parse().ok()?;
-    let mi: i64 = t.next()?.parse().ok()?;
-    let se: i64 = t.next()?.parse().ok()?;
-
-    let y2 = if m <= 2 { y - 1 } else { y };
-    let era = (if y2 >= 0 { y2 } else { y2 - 399 }) / 400;
-    let yoe = y2 - era * 400;
-    let mp = (m + 9) % 12;
-    let doy = (153 * mp + 2) / 5 + day - 1;
-    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
-    let days = era * 146097 + doe - 719468;
-
-    Some(days * 86400 + h * 3600 + mi * 60 + se)
-}
-
-fn resets_in_from_iso(resets_at: Option<&str>) -> String {
-    let target = match resets_at.and_then(parse_iso_utc_epoch) {
-        Some(t) => t,
-        None => return "—".to_string(),
-    };
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_secs() as i64)
-        .unwrap_or(0);
-    fmt_reset(Some(target - now))
 }
 
 fn parse_claude_usage(body: &serde_json::Value) -> Result<UsageResult, ProviderError> {
@@ -147,11 +110,5 @@ mod tests {
         assert_eq!(result.windows.len(), 2);
         assert_eq!(result.windows[0].used_percent, 48.0);
         assert_eq!(result.windows[1].used_percent, 12.0);
-    }
-
-    #[test]
-    fn parses_iso_utc_epoch_correctly() {
-        assert_eq!(parse_iso_utc_epoch("2026-08-28T15:19:59+00:00"), Some(1787930399));
-        assert_eq!(parse_iso_utc_epoch("not a date"), None);
     }
 }

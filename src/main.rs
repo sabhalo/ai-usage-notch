@@ -7,7 +7,7 @@ mod notch;
 mod providers;
 mod settings;
 
-use providers::{ClaudeProvider, CodexProvider, CopilotProvider, FetchError, UsageProvider, UsageReport, UsageResult};
+use providers::{ClaudeProvider, CodexProvider, CopilotProvider, FetchError, GeminiProvider, UsageProvider, UsageReport, UsageResult};
 use tauri_plugin_autostart::MacosLauncher;
 
 /// Ultimo dato noto su disco, per dipingere subito la pill all'avvio invece
@@ -49,13 +49,14 @@ fn save_window_position(x: i32, y: i32) {
 async fn get_all_usage(skip: Vec<String>) -> Vec<UsageReport> {
     let want = |id: &str| !skip.iter().any(|s| s == id);
 
-    let (claude, codex, copilot) = tokio::join!(
+    let (claude, codex, copilot, gemini) = tokio::join!(
         maybe_fetch(want("claude"), ClaudeProvider),
         maybe_fetch(want("codex"), CodexProvider),
         maybe_fetch(want("copilot"), CopilotProvider),
+        maybe_fetch(want("gemini"), GeminiProvider),
     );
 
-    let fresh: Vec<UsageReport> = [claude, codex, copilot].into_iter().flatten().collect();
+    let fresh: Vec<UsageReport> = [claude, codex, copilot, gemini].into_iter().flatten().collect();
 
     let mut merged = cache::load().map(|c| c.reports).unwrap_or_default();
     for report in &fresh {
@@ -91,6 +92,8 @@ fn main() {
         .setup(|app| {
             use tauri::Manager;
             if let Some(window) = app.get_webview_window("main") {
+                #[cfg(debug_assertions)]
+                window.open_devtools();
                 let saved_position = settings::load().window_position;
                 if let Some((x, y)) = saved_position {
                     let _ = window.set_position(tauri::Position::Physical(
@@ -114,6 +117,22 @@ fn main() {
                     }
                 }
             }
+
+            // Il tasto rosso di chiusura, senza questo intercettore, distrugge
+            // la finestra: da quel momento `getByLabel("settings")` in JS
+            // torna sempre None e il gear smette di funzionare per il resto
+            // della sessione (issue #10). La nascondiamo invece di chiuderla,
+            // così resta riutilizzabile da `openSettingsWindow()`.
+            if let Some(settings_window) = app.get_webview_window("settings") {
+                let hide_target = settings_window.clone();
+                settings_window.on_window_event(move |event| {
+                    if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                        api.prevent_close();
+                        let _ = hide_target.hide();
+                    }
+                });
+            }
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

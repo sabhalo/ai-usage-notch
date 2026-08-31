@@ -14,6 +14,7 @@
     <label><input type="checkbox" id="active-claude" /> Claude</label>
     <label><input type="checkbox" id="active-codex" /> Codex</label>
     <label><input type="checkbox" id="active-copilot" /> Copilot</label>
+    <label><input type="checkbox" id="active-gemini" /> Gemini</label>
   </section>
 
   <section>
@@ -27,6 +28,19 @@
     <h2>Allerta</h2>
     <label class="row">Soglia (%)
       <input type="number" id="alert-threshold" min="1" max="100" />
+    </label>
+  </section>
+
+  <section>
+    <h2>Visibilità della pill</h2>
+    <label class="row">Modalità
+      <select id="pill-visibility-mode">
+        <option value="always">Sempre visibile</option>
+        <option value="auto_collapse">Auto-collapse</option>
+      </select>
+    </label>
+    <label class="row" id="pill-collapse-delay-row">Collassa dopo (secondi)
+      <input type="number" id="pill-collapse-delay" min="1" step="1" />
     </label>
   </section>
 
