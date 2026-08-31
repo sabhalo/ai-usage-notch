@@ -1,3 +1,13 @@
+:root {
+  --panel-bg: #161617;
+  --input-bg: #0e0e0f;
+  --border: rgba(255, 255, 255, 0.1);
+  --text: #fff;
+  --text-3: rgba(255, 255, 255, 0.4);
+  --accent: #3576f0;
+  --ok: #3ecf5a;
+}
+
 * {
   box-sizing: border-box;
   margin: 0;
@@ -6,33 +16,36 @@
 
 body {
   font-family: -apple-system, "Segoe UI", "Segoe UI Variable", system-ui, sans-serif;
-  background: #1a1a1d;
-  color: #f2f2f4;
-  padding: 16px 18px;
+  background: var(--panel-bg);
+  color: var(--text);
+  width: 340px;
+  padding: 16px;
 }
 
 h1 {
-  font-size: 15px;
-  margin-bottom: 14px;
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 16px;
 }
 
 section {
-  margin-bottom: 14px;
+  margin-bottom: 4px;
 }
 
 h2 {
   font-size: 11px;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.4px;
-  color: rgba(255, 255, 255, 0.5);
-  margin-bottom: 6px;
+  letter-spacing: 0.06em;
+  color: var(--text-3);
+  margin: 18px 0 10px;
 }
 
 label {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
+  font-size: 14px;
   padding: 3px 0;
 }
 
@@ -40,14 +53,51 @@ label.row {
   justify-content: space-between;
 }
 
+.checkbox-row {
+  cursor: pointer;
+  padding: 5px 0;
+}
+
+.checkbox-row input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.checkbox-box {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.checkbox-row input:checked + .checkbox-box {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.check-icon {
+  opacity: 0;
+}
+
+.checkbox-row input:checked + .checkbox-box .check-icon {
+  opacity: 1;
+}
+
 input[type="number"],
 select {
   width: 70px;
-  background: #121214;
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: var(--input-bg);
+  border: 1px solid var(--border);
   border-radius: 6px;
-  color: #f2f2f4;
-  padding: 4px 6px;
+  color: var(--text);
+  padding: 5px 10px;
   font-size: 13px;
 }
 
@@ -63,7 +113,7 @@ select {
 }
 
 button {
-  background: #22c55e;
+  background: var(--ok);
   color: #0b1a10;
   border: none;
   border-radius: 8px;

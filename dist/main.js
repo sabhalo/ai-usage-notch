@@ -11,11 +11,6 @@ const CACHE_STALE_MS = 10 * 60 * 1000;
 // Due timer distinti che collassavano sotto lo stesso nome prima di issue #8:
 // questo chiude il Panel (dettaglio provider) dopo inattività.
 const PANEL_AUTO_CLOSE_MS = 7000;
-const EXTENDED_WIDTH = 360; // 300 bastava per 3 anelli, con Gemini (4°) serve più spazio (issue #4)
-const PILL_WIDTH_COLLAPSED = 130; // solo anelli miniaturizzati, niente percentuale (issue #8)
-const PILL_HEIGHT_VISIBLE = 46;
-const PILL_HEIGHT_COLLAPSED = 34;
-const PANEL_EXTRA_HEIGHT = 150; // deve restare coerente con .detail nel CSS
 
 // Unica fonte per l'elenco provider: state/everSucceeded/backoff/activeProviders
 // (issue #7) erano quattro liste hardcoded da tenere allineate a mano, un
@@ -23,8 +18,7 @@ const PANEL_EXTRA_HEIGHT = 150; // deve restare coerente con .detail nel CSS
 const PROVIDER_IDS = ["claude", "codex", "copilot", "gemini"];
 const PROVIDER_TITLES = { claude: "Claude", codex: "Codex", copilot: "Copilot", gemini: "Gemini" };
 const UNLIMITED_COLOR = "#8b5cf6"; // viola: distinto dalla scala verde/ambra/rosso, "non applicabile"
-const ERROR_COLOR = "#ef4444";
-const NOT_CONFIGURED_COLOR = "rgba(255, 255, 255, 0.2)";
+const ERROR_COLOR = "#ff4d4d";
 
 const RING_IDS = {
   claude: { pctElId: "claude-pct", ringFgId: "claude-ring-fg", btnId: "claude-btn" },
@@ -59,13 +53,13 @@ let pillCollapsed = false;
 let pillCollapseTimer = null;
 
 function pctColor(p) {
-  if (p >= 90) return "#ef4444";
-  if (p >= 70) return "#f59e0b";
-  return "#22c55e";
+  if (p >= 90) return "#ff4d4d";
+  if (p >= 70) return "#ffab40";
+  return "#3ecf5a";
 }
 
 function setRingColor(circleEl, color, pct) {
-  const r = 15.5;
+  const r = 15;
   const c = 2 * Math.PI * r;
   const clamped = Math.max(0, Math.min(100, pct));
   circleEl.style.strokeDasharray = `${c}`;
@@ -99,7 +93,6 @@ function renderRing(provider, report, stale = false) {
 
   if (notConfigured) {
     pctEl.textContent = "–";
-    setRingColor(ringEl, NOT_CONFIGURED_COLOR, 100);
     btn.classList.remove("alert");
     return;
   }
@@ -296,20 +289,19 @@ function renderDetail(provider) {
 // visible/collapsed — vedi CONTEXT.md) in dimensioni reali della finestra.
 // Il Panel aperto forza sempre la Pill Visible: non esiste uno stato
 // Collapsed+Panel aperto.
+// La geometria (mock Claude Design) non è più hardcoded: si misura il DOM
+// dopo l'applicazione delle classi, invece di duplicare a mano le dimensioni
+// di .pill/.detail qui e in tauri.conf.json.
 async function applyLayout() {
   const panelOpen = !!openProvider;
   const collapsed = pillCollapsed && !panelOpen;
   document.getElementById("detail").hidden = !panelOpen;
   document.querySelector(".pill").classList.toggle("pill-collapsed", collapsed);
 
-  const width = collapsed ? PILL_WIDTH_COLLAPSED : EXTENDED_WIDTH;
-  const h = panelOpen
-    ? PILL_HEIGHT_VISIBLE + PANEL_EXTRA_HEIGHT
-    : collapsed
-    ? PILL_HEIGHT_COLLAPSED
-    : PILL_HEIGHT_VISIBLE;
+  await new Promise(requestAnimationFrame);
+  const box = document.querySelector(".notch");
   try {
-    await win.setSize(new LogicalSize(width, h));
+    await win.setSize(new LogicalSize(Math.ceil(box.offsetWidth), Math.ceil(box.offsetHeight)));
   } catch (e) {
     // Se l'API finestra non è disponibile (vedi README), il pannello si apre
     // comunque: resta solo il piccolo overflow visivo da correggere a mano.
@@ -317,11 +309,17 @@ async function applyLayout() {
   }
 }
 
+function closeProvider() {
+  if (!openProvider) return;
+  document.getElementById(RING_IDS[openProvider].btnId).classList.remove("open");
+  openProvider = null;
+}
+
 function schedulePanelAutoClose() {
   clearTimeout(panelCloseTimer);
   if (!openProvider) return;
   panelCloseTimer = setTimeout(() => {
-    openProvider = null;
+    closeProvider();
     applyLayout();
     schedulePillCollapse();
   }, PANEL_AUTO_CLOSE_MS);
@@ -347,14 +345,16 @@ function wakePill() {
 }
 
 function toggleProvider(provider) {
-  if (openProvider === provider) {
-    openProvider = null;
+  const wasOpen = openProvider === provider;
+  closeProvider();
+  if (wasOpen) {
     clearTimeout(panelCloseTimer);
     applyLayout();
     schedulePillCollapse();
     return;
   }
   openProvider = provider;
+  document.getElementById(RING_IDS[provider].btnId).classList.add("open");
   renderDetail(provider);
   clearTimeout(pillCollapseTimer);
   applyLayout();
@@ -396,7 +396,7 @@ document.getElementById("detail").addEventListener("pointermove", schedulePanelA
 document.getElementById("detail").addEventListener("click", schedulePanelAutoClose);
 win.onFocusChanged(({ payload: focused }) => {
   if (!focused && openProvider) {
-    openProvider = null;
+    closeProvider();
     clearTimeout(panelCloseTimer);
     applyLayout();
     schedulePillCollapse();

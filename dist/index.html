@@ -12,15 +12,9 @@
       <button class="provider" id="codex-btn" data-provider="codex" title="Codex">
         <span class="ring">
           <svg viewBox="0 0 36 36">
-            <circle class="ring-bg" cx="18" cy="18" r="15.5"></circle>
-            <circle class="ring-fg" id="codex-ring-fg" cx="18" cy="18" r="15.5"></circle>
-          </svg>
-          <svg class="icon" viewBox="0 0 22 22">
-            <rect x="2" y="3" width="18" height="18" rx="6" fill="#000"></rect>
-            <rect x="6" y="7" width="10" height="8" rx="3" fill="none" stroke="#fff" stroke-width="1.3"></rect>
-            <circle cx="9" cy="10.5" r="0.8" fill="#fff"></circle>
-            <circle cx="13" cy="10.5" r="0.8" fill="#fff"></circle>
-            <line x1="11" y1="2" x2="11" y2="5" stroke="#fff" stroke-width="1.3"></line>
+            <circle class="ring-bg" cx="18" cy="18" r="15"></circle>
+            <circle class="ring-fg" id="codex-ring-fg" cx="18" cy="18" r="15"></circle>
+            <image class="icon" href="icons/codex.svg" x="9" y="9" width="18" height="18"></image>
           </svg>
         </span>
         <span class="pct" id="codex-pct">—</span>
@@ -29,11 +23,9 @@
       <button class="provider" id="claude-btn" data-provider="claude" title="Claude">
         <span class="ring">
           <svg viewBox="0 0 36 36">
-            <circle class="ring-bg" cx="18" cy="18" r="15.5"></circle>
-            <circle class="ring-fg" id="claude-ring-fg" cx="18" cy="18" r="15.5"></circle>
-          </svg>
-          <svg class="icon" viewBox="0 0 22 22">
-            <path d="M11 2 L13 9 L20 11 L13 13 L11 20 L9 13 L2 11 L9 9 Z" fill="none" stroke="#fff" stroke-width="1.3" stroke-linejoin="round"></path>
+            <circle class="ring-bg" cx="18" cy="18" r="15"></circle>
+            <circle class="ring-fg" id="claude-ring-fg" cx="18" cy="18" r="15"></circle>
+            <image class="icon" href="icons/claude.svg" x="9" y="9" width="18" height="18"></image>
           </svg>
         </span>
         <span class="pct" id="claude-pct">—</span>
@@ -42,13 +34,9 @@
       <button class="provider" id="copilot-btn" data-provider="copilot" title="Copilot">
         <span class="ring">
           <svg viewBox="0 0 36 36">
-            <circle class="ring-bg" cx="18" cy="18" r="15.5"></circle>
-            <circle class="ring-fg" id="copilot-ring-fg" cx="18" cy="18" r="15.5"></circle>
-          </svg>
-          <svg class="icon" viewBox="0 0 22 22">
-            <path d="M11 2c-3.3 0-6 2.5-6 6 0 1.6.6 2.3 1.4 3.4-.5.4-.9 1-.9 2.1 0 2.3 2.4 3.5 5.5 3.5s5.5-1.2 5.5-3.5c0-1-.4-1.7-.9-2.1.8-1.1 1.4-1.8 1.4-3.4 0-3.5-2.7-6-6-6z" fill="none" stroke="#fff" stroke-width="1.3"></path>
-            <circle cx="8.7" cy="9" r="0.9" fill="#fff"></circle>
-            <circle cx="13.3" cy="9" r="0.9" fill="#fff"></circle>
+            <circle class="ring-bg" cx="18" cy="18" r="15"></circle>
+            <circle class="ring-fg" id="copilot-ring-fg" cx="18" cy="18" r="15"></circle>
+            <image class="icon" href="icons/copilot.svg" x="9" y="9" width="18" height="18"></image>
           </svg>
         </span>
         <span class="pct" id="copilot-pct">—</span>
@@ -57,16 +45,19 @@
       <button class="provider" id="gemini-btn" data-provider="gemini" title="Gemini">
         <span class="ring">
           <svg viewBox="0 0 36 36">
-            <circle class="ring-bg" cx="18" cy="18" r="15.5"></circle>
-            <circle class="ring-fg" id="gemini-ring-fg" cx="18" cy="18" r="15.5"></circle>
-          </svg>
-          <svg class="icon" viewBox="0 0 22 22">
-            <path d="M11 1c0 5.5-4.5 10-10 10 5.5 0 10 4.5 10 10 0-5.5 4.5-10 10-10-5.5 0-10-4.5-10-10z" fill="none" stroke="#fff" stroke-width="1.3" stroke-linejoin="round"></path>
+            <circle class="ring-bg" cx="18" cy="18" r="15"></circle>
+            <circle class="ring-fg" id="gemini-ring-fg" cx="18" cy="18" r="15"></circle>
+            <image class="icon" href="icons/gemini.svg" x="9" y="9" width="18" height="18"></image>
           </svg>
         </span>
         <span class="pct" id="gemini-pct">—</span>
       </button>
-      <button class="settings-btn" id="settings-btn" title="Impostazioni">⚙</button>
+      <button class="settings-btn" id="settings-btn" title="Impostazioni">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.65)" stroke-width="1.8">
+          <circle cx="12" cy="12" r="3"></circle>
+          <path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"></path>
+        </svg>
+      </button>
     </div>
     <div class="detail" id="detail" hidden>
       <div class="detail-title" id="detail-title">—</div>
