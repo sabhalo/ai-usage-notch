@@ -13,10 +13,9 @@ const CACHE_STALE_MS = 10 * 60 * 1000;
 const PANEL_AUTO_CLOSE_MS = 7000;
 
 // Unica fonte per l'elenco provider: state/everSucceeded/backoff/activeProviders
-// (issue #7) erano quattro liste hardcoded da tenere allineate a mano, un
-// rischio già con tre provider e peggiore con quattro.
-const PROVIDER_IDS = ["claude", "codex", "copilot", "gemini"];
-const PROVIDER_TITLES = { claude: "Claude", codex: "Codex", copilot: "Copilot", gemini: "Gemini" };
+// evita liste hardcoded da tenere allineate a mano.
+const PROVIDER_IDS = ["claude", "codex", "copilot"];
+const PROVIDER_TITLES = { claude: "Claude", codex: "Codex", copilot: "Copilot" };
 const UNLIMITED_COLOR = "#8b5cf6"; // viola: distinto dalla scala verde/ambra/rosso, "non applicabile"
 const ERROR_COLOR = "#ff4d4d";
 
@@ -24,7 +23,6 @@ const RING_IDS = {
   claude: { pctElId: "claude-pct", ringFgId: "claude-ring-fg", btnId: "claude-btn" },
   codex: { pctElId: "codex-pct", ringFgId: "codex-ring-fg", btnId: "codex-btn" },
   copilot: { pctElId: "copilot-pct", ringFgId: "copilot-ring-fg", btnId: "copilot-btn" },
-  gemini: { pctElId: "gemini-pct", ringFgId: "gemini-ring-fg", btnId: "gemini-btn" },
 };
 
 const state = Object.fromEntries(PROVIDER_IDS.map((p) => [p, null]));
@@ -166,7 +164,9 @@ async function loadRuntimeSettings() {
   try {
     const s = await invoke("get_settings");
     alertThresholdPct = s.alert_threshold_pct;
-    activeProviders = { ...activeProviders, ...s.active_providers };
+    activeProviders = Object.fromEntries(
+      PROVIDER_IDS.map((provider) => [provider, s.active_providers[provider] !== false])
+    );
     refreshMs = Math.max(30, s.refresh_interval_s) * 1000;
     pillVisibilityMode = s.pill_visibility_mode || "always";
     pillCollapseDelayMs = Math.max(1, s.pill_collapse_delay_s || 3) * 1000;
@@ -190,6 +190,7 @@ async function loadCachedUsage() {
   if (!cached) return;
   const stale = Date.now() - cached.timestamp * 1000 > CACHE_STALE_MS;
   for (const report of cached.reports) {
+    if (!PROVIDER_IDS.includes(report.provider)) continue;
     state[report.provider] = report;
     if (!report.error) everSucceeded[report.provider] = true;
     renderRing(report.provider, report, stale);
@@ -221,6 +222,7 @@ async function tick(force) {
 
   for (const report of reports) {
     const p = report.provider;
+    if (!PROVIDER_IDS.includes(p)) continue;
     state[p] = report;
     if (report.error) {
       if (report.retry_after_s) {
@@ -382,9 +384,6 @@ document
 document
   .getElementById("copilot-btn")
   .addEventListener("click", () => toggleProvider("copilot"));
-document
-  .getElementById("gemini-btn")
-  .addEventListener("click", () => toggleProvider("gemini"));
 document
   .getElementById("settings-btn")
   .addEventListener("click", (e) => {

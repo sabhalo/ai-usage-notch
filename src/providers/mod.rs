@@ -1,12 +1,12 @@
 pub mod claude;
 pub mod codex;
 pub mod copilot;
-pub mod gemini;
 
 pub use claude::ClaudeProvider;
 pub use codex::CodexProvider;
 pub use copilot::CopilotProvider;
-pub use gemini::GeminiProvider;
+
+pub(crate) const SUPPORTED_PROVIDER_IDS: [&str; 3] = ["claude", "codex", "copilot"];
 
 use serde::{Deserialize, Serialize};
 
@@ -60,14 +60,20 @@ pub struct FetchError {
 
 impl From<ProviderError> for FetchError {
     fn from(error: ProviderError) -> Self {
-        FetchError { error, retry_after_s: None }
+        FetchError {
+            error,
+            retry_after_s: None,
+        }
     }
 }
 
 /// Legge l'header `retry-after` (intero, secondi) e costruisce l'errore 429
 /// uniforme per i tre provider — duplicato altrimenti in claude.rs/codex.rs/
 /// copilot.rs. Fallback a 900s se l'header manca o non è un intero valido.
-pub(crate) fn too_many_requests(provider_label: &str, headers: &reqwest::header::HeaderMap) -> FetchError {
+pub(crate) fn too_many_requests(
+    provider_label: &str,
+    headers: &reqwest::header::HeaderMap,
+) -> FetchError {
     let secs = parse_retry_after_header(headers).unwrap_or(900);
     FetchError {
         error: ProviderError::RateLimited(format!(
@@ -151,10 +157,8 @@ pub(crate) fn fmt_window(seconds: Option<i64>) -> String {
     }
 }
 
-/// Converte una data ISO 8601 UTC ("2026-08-28T15:19:59.85+00:00") in secondi
-/// dall'epoch, senza dipendenze esterne (algoritmo civile di Howard Hinnant).
-/// Condiviso da claude.rs (`resets_at`) e gemini.rs (`resetTime`) — stesso
-/// formato, fonti diverse.
+/// Converte la data ISO 8601 UTC restituita da Claude in secondi dall'epoch,
+/// senza dipendenze esterne (algoritmo civile di Howard Hinnant).
 pub(crate) fn parse_iso_utc_epoch(s: &str) -> Option<i64> {
     let s = s.get(0..19)?; // "YYYY-MM-DDTHH:MM:SS", ignora frazioni/offset
     let (date, time) = s.split_once('T')?;
@@ -196,7 +200,10 @@ mod tests {
 
     #[test]
     fn parses_iso_utc_epoch_correctly() {
-        assert_eq!(parse_iso_utc_epoch("2026-08-28T15:19:59+00:00"), Some(1787930399));
+        assert_eq!(
+            parse_iso_utc_epoch("2026-08-28T15:19:59+00:00"),
+            Some(1787930399)
+        );
         assert_eq!(parse_iso_utc_epoch("not a date"), None);
     }
 

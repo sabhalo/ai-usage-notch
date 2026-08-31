@@ -1,4 +1,7 @@
-use super::{ProviderError, UsageProvider, UsageResult, UsageWindow, fmt_reset, fmt_window, too_many_requests, FetchError};
+use super::{
+    fmt_reset, fmt_window, too_many_requests, FetchError, ProviderError, UsageProvider,
+    UsageResult, UsageWindow,
+};
 use crate::credentials;
 
 /// Stessa logica per Codex CLI. `~/.codex/auth.json` contiene un access token
@@ -74,8 +77,14 @@ fn parse_codex_usage(body: &serde_json::Value) -> Result<UsageResult, ProviderEr
                 .get("used_percent")
                 .and_then(|v| v.as_f64())
                 .unwrap_or(0.0);
-            let resets = secondary.get("reset_after_seconds").and_then(|v| v.as_i64());
-            let window = fmt_window(secondary.get("limit_window_seconds").and_then(|v| v.as_i64()));
+            let resets = secondary
+                .get("reset_after_seconds")
+                .and_then(|v| v.as_i64());
+            let window = fmt_window(
+                secondary
+                    .get("limit_window_seconds")
+                    .and_then(|v| v.as_i64()),
+            );
             windows.push(UsageWindow {
                 label: format!("Finestra secondaria ({window})"),
                 used_percent: pct,

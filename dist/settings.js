@@ -10,7 +10,6 @@ async function load() {
   document.getElementById("active-claude").checked = settings.active_providers.claude !== false;
   document.getElementById("active-codex").checked = settings.active_providers.codex !== false;
   document.getElementById("active-copilot").checked = settings.active_providers.copilot !== false;
-  document.getElementById("active-gemini").checked = settings.active_providers.gemini !== false;
   document.getElementById("refresh-interval").value = settings.refresh_interval_s;
   document.getElementById("alert-threshold").value = settings.alert_threshold_pct;
   document.getElementById("pill-visibility-mode").value = settings.pill_visibility_mode || "always";
@@ -29,7 +28,6 @@ async function save() {
     claude: document.getElementById("active-claude").checked,
     codex: document.getElementById("active-codex").checked,
     copilot: document.getElementById("active-copilot").checked,
-    gemini: document.getElementById("active-gemini").checked,
   };
   settings.refresh_interval_s = Number(document.getElementById("refresh-interval").value) || 90;
   settings.alert_threshold_pct = Number(document.getElementById("alert-threshold").value) || 80;

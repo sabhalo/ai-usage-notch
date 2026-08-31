@@ -1,4 +1,7 @@
-use super::{ProviderError, UsageProvider, UsageResult, UsageWindow, resets_in_from_iso, too_many_requests, FetchError};
+use super::{
+    resets_in_from_iso, too_many_requests, FetchError, ProviderError, UsageProvider, UsageResult,
+    UsageWindow,
+};
 use crate::credentials;
 
 /// Shape della risposta verificata su dati reali, vedi
@@ -34,11 +37,9 @@ impl UsageProvider for ClaudeProvider {
             return Err(too_many_requests("Anthropic", resp.headers()));
         }
         if !resp.status().is_success() {
-            return Err(ProviderError::Network(format!(
-                "Anthropic ha risposto {}",
-                resp.status()
-            ))
-            .into());
+            return Err(
+                ProviderError::Network(format!("Anthropic ha risposto {}", resp.status())).into(),
+            );
         }
 
         let body: serde_json::Value = resp
@@ -56,7 +57,10 @@ impl UsageProvider for ClaudeProvider {
 fn parse_claude_usage(body: &serde_json::Value) -> Result<UsageResult, ProviderError> {
     let mut windows = vec![];
     if let Some(session) = body.get("five_hour") {
-        let pct = session.get("utilization").and_then(|v| v.as_f64()).unwrap_or(0.0);
+        let pct = session
+            .get("utilization")
+            .and_then(|v| v.as_f64())
+            .unwrap_or(0.0);
         let resets = session.get("resets_at").and_then(|v| v.as_str());
         windows.push(UsageWindow {
             label: "Sessione (5h)".into(),
@@ -66,7 +70,10 @@ fn parse_claude_usage(body: &serde_json::Value) -> Result<UsageResult, ProviderE
         });
     }
     if let Some(week) = body.get("seven_day") {
-        let pct = week.get("utilization").and_then(|v| v.as_f64()).unwrap_or(0.0);
+        let pct = week
+            .get("utilization")
+            .and_then(|v| v.as_f64())
+            .unwrap_or(0.0);
         let resets = week.get("resets_at").and_then(|v| v.as_str());
         windows.push(UsageWindow {
             label: "Tutti i modelli (7g)".into(),

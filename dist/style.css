@@ -37,6 +37,7 @@ html, body {
   display: flex;
   flex-direction: column;
   align-items: center;
+  width: max-content;
   /* La finestra Tauri è trasparente e senza ombra nativa (shadow: false):
      l'ombra CSS della pill/panel viene disegnata dentro la finestra, quindi
      serve margine su tutti i lati per non tagliarla. */

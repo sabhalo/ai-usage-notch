@@ -1,3 +1,7 @@
 /target
 gen/
-.claude/
+.claude/*
+!.claude/settings.json
+.codex/*
+!.codex/config.toml
+!.codex/hooks.json

@@ -7,7 +7,10 @@ mod notch;
 mod providers;
 mod settings;
 
-use providers::{ClaudeProvider, CodexProvider, CopilotProvider, FetchError, GeminiProvider, UsageProvider, UsageReport, UsageResult};
+use providers::{
+    ClaudeProvider, CodexProvider, CopilotProvider, FetchError, UsageProvider, UsageReport,
+    UsageResult,
+};
 use tauri_plugin_autostart::MacosLauncher;
 
 /// Ultimo dato noto su disco, per dipingere subito la pill all'avvio invece
@@ -49,14 +52,13 @@ fn save_window_position(x: i32, y: i32) {
 async fn get_all_usage(skip: Vec<String>) -> Vec<UsageReport> {
     let want = |id: &str| !skip.iter().any(|s| s == id);
 
-    let (claude, codex, copilot, gemini) = tokio::join!(
+    let (claude, codex, copilot) = tokio::join!(
         maybe_fetch(want("claude"), ClaudeProvider),
         maybe_fetch(want("codex"), CodexProvider),
         maybe_fetch(want("copilot"), CopilotProvider),
-        maybe_fetch(want("gemini"), GeminiProvider),
     );
 
-    let fresh: Vec<UsageReport> = [claude, codex, copilot, gemini].into_iter().flatten().collect();
+    let fresh: Vec<UsageReport> = [claude, codex, copilot].into_iter().flatten().collect();
 
     let mut merged = cache::load().map(|c| c.reports).unwrap_or_default();
     for report in &fresh {

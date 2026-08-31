@@ -1,4 +1,6 @@
-use super::{ProviderError, UsageProvider, UsageResult, UsageWindow, too_many_requests, FetchError};
+use super::{
+    too_many_requests, FetchError, ProviderError, UsageProvider, UsageResult, UsageWindow,
+};
 use crate::credentials;
 
 /// GitHub Copilot: quota mensile di "premium request", non finestre a
@@ -78,7 +80,10 @@ fn parse_copilot_usage(body: &serde_json::Value) -> Result<UsageResult, Provider
         .get("unlimited")
         .and_then(|v| v.as_bool())
         .unwrap_or(false);
-    let overage_count = premium.get("overage_count").and_then(|v| v.as_i64()).unwrap_or(0);
+    let overage_count = premium
+        .get("overage_count")
+        .and_then(|v| v.as_i64())
+        .unwrap_or(0);
 
     let (used_percent, label) = if unlimited {
         (0.0, "Premium requests (illimitate)".to_string())
@@ -87,8 +92,14 @@ fn parse_copilot_usage(body: &serde_json::Value) -> Result<UsageResult, Provider
             .get("percent_remaining")
             .and_then(|v| v.as_f64())
             .unwrap_or(0.0);
-        let remaining = premium.get("remaining").and_then(|v| v.as_i64()).unwrap_or(0);
-        let entitlement = premium.get("entitlement").and_then(|v| v.as_i64()).unwrap_or(0);
+        let remaining = premium
+            .get("remaining")
+            .and_then(|v| v.as_i64())
+            .unwrap_or(0);
+        let entitlement = premium
+            .get("entitlement")
+            .and_then(|v| v.as_i64())
+            .unwrap_or(0);
         (
             100.0 - remaining_pct,
             format!("Premium requests ({remaining}/{entitlement})"),

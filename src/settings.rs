@@ -7,13 +7,14 @@
 //! fonte di verità per quello (registra/rimuove l'app dal login OS), un
 //! secondo flag qui rischierebbe solo di disallinearsi.
 
+use crate::providers::SUPPORTED_PROVIDER_IDS;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
 
 fn default_active_providers() -> HashMap<String, bool> {
-    ["claude", "codex", "copilot", "gemini"]
-        .into_iter()
+    SUPPORTED_PROVIDER_IDS
+        .iter()
         .map(|p| (p.to_string(), true))
         .collect()
 }
@@ -70,10 +71,11 @@ fn settings_path() -> Option<PathBuf> {
 }
 
 pub fn load() -> Settings {
-    settings_path()
+    let settings: Settings = settings_path()
         .and_then(|p| std::fs::read_to_string(p).ok())
         .and_then(|raw| serde_json::from_str(&raw).ok())
-        .unwrap_or_default()
+        .unwrap_or_default();
+    normalize(settings)
 }
 
 pub fn save(settings: &Settings) {
@@ -81,7 +83,79 @@ pub fn save(settings: &Settings) {
     if let Some(parent) = path.parent() {
         let _ = std::fs::create_dir_all(parent);
     }
-    if let Ok(json) = serde_json::to_string_pretty(settings) {
+    if let Ok(json) = serde_json::to_string_pretty(&normalize(settings.clone())) {
         let _ = std::fs::write(path, json);
+    }
+}
+
+fn normalize(mut settings: Settings) -> Settings {
+    settings
+        .active_providers
+        .retain(|provider, _| SUPPORTED_PROVIDER_IDS.contains(&provider.as_str()));
+    for provider in SUPPORTED_PROVIDER_IDS {
+        settings
+            .active_providers
+            .entry(provider.to_string())
+            .or_insert(true);
+    }
+    settings
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn removes_unknown_provider() {
+        let mut settings = Settings::default();
+        settings
+            .active_providers
+            .insert("removed-provider".to_string(), true);
+
+        let normalized = normalize(settings);
+
+        assert!(!normalized.active_providers.contains_key("removed-provider"));
+    }
+
+    #[test]
+    fn adds_missing_supported_provider_with_default() {
+        let mut settings = Settings::default();
+        settings.active_providers.remove("codex");
+
+        let normalized = normalize(settings);
+
+        assert_eq!(normalized.active_providers.get("codex"), Some(&true));
+    }
+
+    #[test]
+    fn preserves_false_for_supported_provider() {
+        let mut settings = Settings::default();
+        settings
+            .active_providers
+            .insert("copilot".to_string(), false);
+
+        let normalized = normalize(settings);
+
+        assert_eq!(normalized.active_providers.get("copilot"), Some(&false));
+    }
+
+    #[test]
+    fn preserves_other_settings_properties() {
+        let settings = Settings {
+            window_position: Some((12, 34)),
+            active_providers: HashMap::new(),
+            refresh_interval_s: 42,
+            alert_threshold_pct: 73.5,
+            pill_visibility_mode: "auto_collapse".to_string(),
+            pill_collapse_delay_s: 9,
+        };
+
+        let normalized = normalize(settings);
+
+        assert_eq!(normalized.window_position, Some((12, 34)));
+        assert_eq!(normalized.refresh_interval_s, 42);
+        assert_eq!(normalized.alert_threshold_pct, 73.5);
+        assert_eq!(normalized.pill_visibility_mode, "auto_collapse");
+        assert_eq!(normalized.pill_collapse_delay_s, 9);
     }
 }
