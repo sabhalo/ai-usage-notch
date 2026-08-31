@@ -1,3 +1,4 @@
 /target
 gen/
-.claude/
+.claude/*
+!.claude/settings.json

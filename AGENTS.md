@@ -11,3 +11,10 @@ Default canonical vocabulary: `needs-triage`, `needs-info`, `ready-for-agent`, `
 ### Domain docs
 
 Single-context: `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.
+
+### Serena memories
+
+Versioned domain memories live in `.serena/memories/`. Read `mem:core` first — it's the graph
+root and points to the rest (build/test, architecture, conventions). Update them via Serena's
+`write_memory` when a stable, non-obvious convention changes; keep to the threshold in
+`mem:memory_maintenance`.
