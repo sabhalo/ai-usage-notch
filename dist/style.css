@@ -47,6 +47,77 @@ html, body {
   background: rgba(255, 255, 255, 0.08);
 }
 
+.provider.overage {
+  box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.6) inset;
+}
+
+.provider.not-configured {
+  opacity: 0.45;
+}
+
+.provider.stale {
+  opacity: 0.6;
+}
+
+.provider.alert .ring-fg {
+  animation: pulse-alert 1.2s ease-in-out infinite;
+}
+
+@keyframes pulse-alert {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.settings-btn {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 8px;
+  margin-left: 2px;
+}
+
+.settings-btn:hover {
+  color: #f2f2f4;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* Pill Collapsed (issue #8, CONTEXT.md): anelli miniaturizzati, niente
+   percentuale né divisori — solo lo stato a colpo d'occhio. Sveglia al
+   passaggio del mouse (main.js: wakePill). */
+.pill.pill-collapsed {
+  height: 34px;
+  padding: 0 8px;
+  gap: 3px;
+}
+
+.pill.pill-collapsed .settings-btn,
+.pill.pill-collapsed .divider,
+.pill.pill-collapsed .pct {
+  display: none;
+}
+
+.pill.pill-collapsed .provider {
+  padding: 2px 3px;
+  gap: 0;
+}
+
+.pill.pill-collapsed .ring {
+  width: 16px;
+  height: 16px;
+}
+
+.pill.pill-collapsed .icon {
+  width: 10px;
+  height: 10px;
+}
+
 .divider {
   width: 1px;
   height: 20px;
@@ -84,8 +155,8 @@ html, body {
 
 .icon {
   position: relative;
-  font-size: 10px;
-  color: #f2f2f4;
+  width: 14px;
+  height: 14px;
 }
 
 .pct {
@@ -97,7 +168,7 @@ html, body {
 }
 
 .detail {
-  width: 220px;
+  width: 360px;
   margin-top: 6px;
   background: #121214;
   border-radius: 14px;
@@ -152,4 +223,33 @@ html, body {
   color: #f59e0b;
   font-size: 11px;
   line-height: 1.4;
+  border-left: 3px solid #f59e0b;
+  padding-left: 8px;
+}
+
+/* Tre casi distinti in UI (plan/step-3.3.md): non loggato (ambra, azione
+   dell'utente), non autorizzato/rete (rosso, problema esterno),
+   endpoint cambiato (blu, azione dello sviluppatore — rilanciare probe). */
+.detail-error[data-kind="NotLoggedIn"] {
+  border-left-color: #f59e0b;
+}
+
+.detail-error[data-kind="Unauthorized"],
+.detail-error[data-kind="Network"] {
+  border-left-color: #ef4444;
+}
+
+.detail-error[data-kind="UnexpectedShape"] {
+  border-left-color: #3b82f6;
+}
+
+.badge-overage {
+  color: #ef4444;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  border: 1px solid rgba(239, 68, 68, 0.5);
+  border-radius: 4px;
+  padding: 1px 4px;
+  margin-left: 4px;
 }
