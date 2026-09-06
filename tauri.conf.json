@@ -34,8 +34,8 @@
         "label": "settings",
         "title": "Impostazioni — AI Usage",
         "url": "settings.html",
-        "width": 320,
-        "height": 380,
+        "width": 340,
+        "height": 580,
         "resizable": false,
         "skipTaskbar": true,
         "visible": false

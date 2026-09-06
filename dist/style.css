@@ -36,7 +36,13 @@ html, body {
 .notch {
   display: flex;
   flex-direction: column;
-  align-items: center;
+  /* L'allineamento a sinistra non è estetico ma funzionale: `.notch` è
+     `width: max-content` e `setSize` tiene fisso l'angolo in alto a sinistra
+     della finestra, quindi con `align-items: center` la Pill veniva ricentrata
+     sopra il `.detail` da 280px e scivolava a destra all'apertura del Panel.
+     Ancorata a `flex-start` la Pill sta ferma in tutti gli stati (il Panel
+     risulta allineato al bordo sinistro della Pill anziché centrato). */
+  align-items: flex-start;
   width: max-content;
   /* La finestra Tauri è trasparente e senza ombra nativa (shadow: false):
      l'ombra CSS della pill/panel viene disegnata dentro la finestra, quindi
@@ -65,6 +71,15 @@ html, body {
   padding: 4px 8px;
   border-radius: 6px;
   transition: background 0.15s ease;
+}
+
+/* `[hidden]` da solo è un no-op qui: `.provider { display: flex }` batte
+   sempre la regola `[hidden] { display: none }` dell'user-agent. Serve una
+   regola author esplicita per nascondere un provider disattivato (e il suo
+   divisore, ricalcolato in main.js: applyProviderVisibility). */
+.provider[hidden],
+.divider[hidden] {
+  display: none;
 }
 
 .provider:hover {
