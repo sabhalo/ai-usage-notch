@@ -18,7 +18,7 @@ body {
   font-family: -apple-system, "Segoe UI", "Segoe UI Variable", system-ui, sans-serif;
   background: var(--panel-bg);
   color: var(--text);
-  width: 340px;
+  width: 100%;
   padding: 16px;
 }
 
@@ -47,6 +47,13 @@ label {
   gap: 8px;
   font-size: 14px;
   padding: 3px 0;
+}
+
+/* `label { display: flex }` batte `[hidden]` dell'user-agent: senza questa
+   regola la riga "Collassa dopo (secondi)" resta visibile anche in modalità
+   "Sempre visibile" (settings.js: updateCollapseDelayVisibility). */
+label[hidden] {
+  display: none;
 }
 
 label.row {

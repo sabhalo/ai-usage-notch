@@ -173,10 +173,32 @@ async function loadRuntimeSettings() {
   } catch (e) {
     console.warn("impostazioni non disponibili, uso i default:", e);
   }
+  applyProviderVisibility();
+}
+
+// Nasconde i bottoni dei provider disattivati e ricalcola i divisori: un
+// divisore ha senso solo tra due provider visibili, quindi va derivato dallo
+// stato corrente invece di legarlo staticamente a un provider in index.html
+// (così non restano divisori orfani in testa/coda o doppi).
+function applyProviderVisibility() {
   for (const [provider, active] of Object.entries(activeProviders)) {
     const ids = RING_IDS[provider];
     if (ids) document.getElementById(ids.btnId).hidden = !active;
   }
+  let seenVisible = false;
+  let pendingDivider = null;
+  for (const el of document.querySelector(".pill").children) {
+    if (el.classList.contains("divider")) {
+      el.hidden = true;
+      pendingDivider = el;
+    } else if (el.classList.contains("provider") && !el.hidden) {
+      if (seenVisible && pendingDivider) pendingDivider.hidden = false;
+      seenVisible = true;
+      pendingDivider = null;
+    }
+  }
+  // Un Panel aperto su un provider appena disattivato va chiuso.
+  if (openProvider && !activeProviders[openProvider]) closeProvider();
 }
 
 async function loadCachedUsage() {
@@ -191,6 +213,7 @@ async function loadCachedUsage() {
   const stale = Date.now() - cached.timestamp * 1000 > CACHE_STALE_MS;
   for (const report of cached.reports) {
     if (!PROVIDER_IDS.includes(report.provider)) continue;
+    if (!activeProviders[report.provider]) continue;
     state[report.provider] = report;
     if (!report.error) everSucceeded[report.provider] = true;
     renderRing(report.provider, report, stale);
@@ -417,9 +440,55 @@ pillEl.addEventListener("contextmenu", (e) => {
 pillEl.addEventListener("mouseenter", wakePill);
 pillEl.addEventListener("pointermove", wakePill);
 
-// Trascinamento nativo via data-tauri-drag-region sulla pill (index.html);
-// qui persistiamo solo la posizione finale, con un debounce per non scrivere
-// su disco a ogni pixel di movimento (plan/step-4.1.md).
+// Il drag nativo di Tauri (data-tauri-drag-region) risale il composedPath e si
+// ferma sul primo elemento cliccabile: sui bottoni provider/impostazioni non
+// parte mai, restava trascinabile solo il padding tra le icone. Qui lo
+// gestiamo a mano con una soglia di movimento, così l'intera barra è
+// trascinabile senza perdere il click che apre il Panel.
+const DRAG_THRESHOLD_PX = 4;
+let dragOrigin = null;
+let draggedSincePointerDown = false;
+
+pillEl.addEventListener("pointerdown", (e) => {
+  if (e.button !== 0) return; // il tasto destro resta il refresh manuale
+  dragOrigin = { x: e.clientX, y: e.clientY };
+  draggedSincePointerDown = false;
+});
+
+pillEl.addEventListener("pointermove", (e) => {
+  if (!dragOrigin || draggedSincePointerDown) return;
+  if (Math.hypot(e.clientX - dragOrigin.x, e.clientY - dragOrigin.y) < DRAG_THRESHOLD_PX) return;
+  draggedSincePointerDown = true;
+  win.startDragging().catch((err) => console.warn("drag non disponibile:", err));
+});
+
+window.addEventListener("pointerup", () => {
+  dragOrigin = null;
+});
+window.addEventListener("pointercancel", () => {
+  dragOrigin = null;
+});
+
+// Se il gesto è finito in un drag, il click conclusivo non deve aprire il
+// Panel né le Impostazioni: intercettato in fase di capture, prima dei
+// listener dei bottoni. Su Windows dopo start_dragging il webview non riceve
+// più né pointerup né click: draggedSincePointerDown resta true ma viene
+// azzerato dal pointerdown del gesto successivo, quindi non mangia il click
+// buono dopo.
+pillEl.addEventListener(
+  "click",
+  (e) => {
+    if (!draggedSincePointerDown) return;
+    draggedSincePointerDown = false;
+    e.stopPropagation();
+    e.preventDefault();
+  },
+  true
+);
+
+// Trascinata la finestra (nativamente o via startDragging), qui persistiamo
+// solo la posizione finale, con un debounce per non scrivere su disco a ogni
+// pixel di movimento (plan/step-4.1.md).
 let dragSaveTimer = null;
 win.onMoved(({ payload }) => {
   clearTimeout(dragSaveTimer);
@@ -430,27 +499,47 @@ win.onMoved(({ payload }) => {
   }, 400);
 });
 
-// La modalità di visibilità va commutabile dalle impostazioni senza
-// riavviare (issue #8): riletta a ogni tick invece di un canale di eventi
-// dedicato, riusando il polling che il resto dell'app già fa ogni TICK_MS.
-async function refreshVisibilitySettings() {
-  const prevMode = pillVisibilityMode;
-  await loadRuntimeSettings();
+// Riallinea il timer di collasso al valore corrente di pillVisibilityMode.
+function realignCollapseTimer(prevMode) {
   if (pillVisibilityMode === prevMode) return;
   if (pillVisibilityMode !== "auto_collapse") {
     clearTimeout(pillCollapseTimer);
-    if (pillCollapsed) {
-      pillCollapsed = false;
-      applyLayout();
-    }
+    pillCollapsed = false;
   } else {
     schedulePillCollapse();
   }
 }
 
+// Applicazione immediata al Salva: settings.js emette "settings-changed",
+// qui rileggiamo le impostazioni (che ora include applyProviderVisibility),
+// riallineiamo il timer di collasso e ridimensioniamo la finestra senza
+// aspettare il prossimo tick.
+async function applySettingsNow() {
+  const prevMode = pillVisibilityMode;
+  await loadRuntimeSettings();
+  realignCollapseTimer(prevMode);
+  await applyLayout();
+}
+window.__TAURI__.event
+  .listen("settings-changed", applySettingsNow)
+  .catch((e) => console.warn("listen settings-changed non disponibile:", e));
+
+// Rete di sicurezza se l'evento non arriva: la modalità di visibilità e
+// l'insieme dei provider attivi vanno comunque riletti dal polling che il
+// resto dell'app già fa ogni TICK_MS.
+async function refreshVisibilitySettings() {
+  const prevMode = pillVisibilityMode;
+  const prevActive = JSON.stringify(activeProviders);
+  await loadRuntimeSettings();
+  const activeChanged = JSON.stringify(activeProviders) !== prevActive;
+  realignCollapseTimer(prevMode);
+  if (pillVisibilityMode !== prevMode || activeChanged) applyLayout();
+}
+
 async function boot() {
   await loadRuntimeSettings();
   await loadCachedUsage();
+  await applyLayout(); // restringe la finestra se qualche provider parte disattivato
   await tick(true); // il primo giro è sempre forzato, non aspetta il primo tick
   setInterval(() => {
     refreshVisibilitySettings();
