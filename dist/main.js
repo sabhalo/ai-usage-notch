@@ -50,6 +50,22 @@ let pillCollapseDelayMs = 3000;
 let pillCollapsed = false;
 let pillCollapseTimer = null;
 
+// Scala della Pill (vedi CONTEXT.md: "Scale"): moltiplicatore continuo
+// applicato a tutte le misure via la custom property --pill-scale, che pilota
+// html { font-size } in style.css. Non è una densità: vale identica in
+// entrambe le modalità di Visibilità.
+const PILL_SCALE_MIN = 0.7;
+const PILL_SCALE_MAX = 2.0;
+let pillScale = 1;
+
+// Clamp lato frontend con gli stessi limiti del backend (difesa in
+// profondità; serve comunque all'anteprima live, che non passa da normalize()).
+function applyPillScale(v) {
+  const n = Number(v);
+  pillScale = Number.isFinite(n) ? Math.min(PILL_SCALE_MAX, Math.max(PILL_SCALE_MIN, n)) : 1;
+  document.documentElement.style.setProperty("--pill-scale", String(pillScale));
+}
+
 function pctColor(p) {
   if (p >= 90) return "#ff4d4d";
   if (p >= 70) return "#ffab40";
@@ -170,6 +186,7 @@ async function loadRuntimeSettings() {
     refreshMs = Math.max(30, s.refresh_interval_s) * 1000;
     pillVisibilityMode = s.pill_visibility_mode || "always";
     pillCollapseDelayMs = Math.max(1, s.pill_collapse_delay_s || 3) * 1000;
+    applyPillScale(s.pill_scale);
   } catch (e) {
     console.warn("impostazioni non disponibili, uso i default:", e);
   }
@@ -524,22 +541,44 @@ window.__TAURI__.event
   .listen("settings-changed", applySettingsNow)
   .catch((e) => console.warn("listen settings-changed non disponibile:", e));
 
+// Anteprima live della Scala mentre l'utente muove lo slider nelle
+// Impostazioni: applica la scala e ridimensiona la finestra senza toccare
+// settings.json. La persistenza avviene solo al Salva (settings-changed);
+// chiudere le Impostazioni senza salvare riemette "settings-changed" (Rust)
+// e riporta la Pill alla scala persistita.
+window.__TAURI__.event
+  .listen("pill-scale-preview", ({ payload }) => {
+    applyPillScale(payload);
+    applyLayout();
+  })
+  .catch((e) => console.warn("listen pill-scale-preview non disponibile:", e));
+
 // Rete di sicurezza se l'evento non arriva: la modalità di visibilità e
 // l'insieme dei provider attivi vanno comunque riletti dal polling che il
 // resto dell'app già fa ogni TICK_MS.
 async function refreshVisibilitySettings() {
   const prevMode = pillVisibilityMode;
   const prevActive = JSON.stringify(activeProviders);
+  const prevScale = pillScale;
   await loadRuntimeSettings();
   const activeChanged = JSON.stringify(activeProviders) !== prevActive;
   realignCollapseTimer(prevMode);
-  if (pillVisibilityMode !== prevMode || activeChanged) applyLayout();
+  // La scala va nella change-detection: sul percorso di fallback (evento
+  // "settings-changed" perso) senza questo la nuova Scala non produrrebbe
+  // mai un setSize e resterebbe spazio morto trasparente ai bordi.
+  if (pillVisibilityMode !== prevMode || activeChanged || pillScale !== prevScale) applyLayout();
 }
 
 async function boot() {
   await loadRuntimeSettings();
   await loadCachedUsage();
   await applyLayout(); // restringe la finestra se qualche provider parte disattivato
+  // Ora che la finestra ha la larghezza reale (scala inclusa), ricentra la
+  // Pill se l'utente non l'ha mai spostata: il centraggio nel setup() Rust
+  // gira sui 330x56 dichiarati e con scale grandi sbaglierebbe di molto.
+  invoke("center_if_unpositioned").catch((e) =>
+    console.warn("center_if_unpositioned non disponibile:", e)
+  );
   await tick(true); // il primo giro è sempre forzato, non aspetta il primo tick
   setInterval(() => {
     refreshVisibilitySettings();

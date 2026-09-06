@@ -25,6 +25,18 @@ function updateCollapseDelayVisibility() {
   fitWindowToContent();
 }
 
+// Anteprima live: a ogni spostamento dello slider aggiorna l'etichetta ed
+// emette "pill-scale-preview" verso la Pill. Nessuna scrittura su disco: la
+// persistenza è solo al Salva (save()).
+const pillScaleInput = document.getElementById("pill-scale");
+const pillScaleOut = document.getElementById("pill-scale-out");
+pillScaleInput.addEventListener("input", () => {
+  pillScaleOut.textContent = `${pillScaleInput.value}%`;
+  window.__TAURI__.event
+    .emit("pill-scale-preview", Number(pillScaleInput.value) / 100)
+    .catch((e) => console.warn("impossibile inviare l'anteprima della scala:", e));
+});
+
 async function load() {
   const settings = await invoke("get_settings");
   document.getElementById("active-claude").checked = settings.active_providers.claude !== false;
@@ -34,6 +46,9 @@ async function load() {
   document.getElementById("alert-threshold").value = settings.alert_threshold_pct;
   document.getElementById("pill-visibility-mode").value = settings.pill_visibility_mode || "always";
   document.getElementById("pill-collapse-delay").value = settings.pill_collapse_delay_s;
+  const pct = Math.round((settings.pill_scale ?? 1) * 100);
+  pillScaleInput.value = pct;
+  pillScaleOut.textContent = `${pct}%`;
   updateCollapseDelayVisibility();
   try {
     document.getElementById("autostart").checked = await invoke("plugin:autostart|is_enabled");
@@ -54,6 +69,7 @@ async function save() {
   settings.alert_threshold_pct = Number(document.getElementById("alert-threshold").value) || 80;
   settings.pill_visibility_mode = document.getElementById("pill-visibility-mode").value;
   settings.pill_collapse_delay_s = Number(document.getElementById("pill-collapse-delay").value) || 3;
+  settings.pill_scale = Number(pillScaleInput.value) / 100 || 1;
   await invoke("save_settings", { settings });
 
   const wantAutostart = document.getElementById("autostart").checked;

@@ -23,6 +23,10 @@ The transition from Collapsed back to Visible, triggered by hovering the Pill. N
 Governs whether the Pill can ever become Collapsed: **Always** (never collapses) or **Auto-collapse** (collapses after N seconds of inactivity, N configurable).
 _Avoid_: display mode, density
 
+**Scale** (setting):
+A continuous multiplier (70%–200%, default 100%) applied to every measurement of the Pill and its Panel. Orthogonal to Visibility and Panel — it scales the Visible state, the Collapsed state and the Panel alike. Not a density: it does not reintroduce the retired "compact" axis, and it adds no new state.
+_Avoid_: density, compact, zoom, size mode
+
 **Panel**:
 The dropdown shown below the Pill with one provider's detail rows (per-window usage bars, reset countdowns). Independent of Pill visibility: opening the Panel always forces the Pill to Visible, and the Pill cannot collapse while the Panel is Open.
 _Avoid_: detail view, drawer, dropdown (as a state name — "dropdown" is fine as a passing visual description, not as the state word)

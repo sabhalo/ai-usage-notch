@@ -112,6 +112,51 @@ select {
   width: auto;
 }
 
+/* Slider della Scala della Pill. La finestra Impostazioni è una finestra
+   normale e resta a grandezza fissa: nessun rem/--pill-scale qui. */
+.slider-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.slider-wrap output {
+  font-size: 13px;
+  color: var(--text-3);
+  min-width: 38px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 140px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--input-bg);
+  border: 1px solid var(--border);
+  cursor: pointer;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: none;
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: none;
+}
+
 .actions {
   display: flex;
   align-items: center;

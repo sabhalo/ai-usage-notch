@@ -206,6 +206,7 @@ calo della percentuale indica il reset della finestra e riabilita la notifica.
 | Provider attivi | Tutti | Claude, Codex e Copilot sono configurabili separatamente |
 | Intervallo refresh | 300 secondi | Minimo 30 secondi nell'interfaccia |
 | Soglia di allerta | 80% | Valore tra 1 e 100 |
+| Grandezza | 100% | Scala continua tra 70% e 200%, ridimensiona Pill e Panel |
 | Visibility mode | `Always` | `Auto-collapse` abilita il collasso per inattività |
 | Ritardo Auto-collapse | 3 secondi | Usato solo in modalità `Auto-collapse` |
 | Avvia al login | Gestito dal sistema operativo | Non viene duplicato in `settings.json` |
