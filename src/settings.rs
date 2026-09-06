@@ -37,6 +37,17 @@ fn default_pill_collapse_delay_s() -> u64 {
     3
 }
 
+// Scala della Pill: moltiplicatore continuo applicato a tutte le misure del
+// frontend via --pill-scale (main.js: applyPillScale). Non è una densità
+// (vedi CONTEXT.md): agisce identicamente in entrambe le modalità di
+// Visibilità, sullo stato Visible come sul Collapsed e sul Panel.
+fn default_pill_scale() -> f64 {
+    1.0
+}
+
+pub const PILL_SCALE_MIN: f64 = 0.7;
+pub const PILL_SCALE_MAX: f64 = 2.0;
+
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Settings {
     #[serde(default)]
@@ -51,6 +62,8 @@ pub struct Settings {
     pub pill_visibility_mode: String,
     #[serde(default = "default_pill_collapse_delay_s")]
     pub pill_collapse_delay_s: u64,
+    #[serde(default = "default_pill_scale")]
+    pub pill_scale: f64,
 }
 
 impl Default for Settings {
@@ -62,6 +75,7 @@ impl Default for Settings {
             alert_threshold_pct: default_alert_threshold_pct(),
             pill_visibility_mode: default_pill_visibility_mode(),
             pill_collapse_delay_s: default_pill_collapse_delay_s(),
+            pill_scale: default_pill_scale(),
         }
     }
 }
@@ -98,6 +112,13 @@ fn normalize(mut settings: Settings) -> Settings {
             .entry(provider.to_string())
             .or_insert(true);
     }
+    // Unico punto attraversato sia da load() sia da save(): copre un
+    // settings.json modificato a mano e un valore fuori range dal frontend.
+    settings.pill_scale = if settings.pill_scale.is_finite() {
+        settings.pill_scale.clamp(PILL_SCALE_MIN, PILL_SCALE_MAX)
+    } else {
+        default_pill_scale()
+    };
     settings
 }
 
@@ -148,6 +169,7 @@ mod tests {
             alert_threshold_pct: 73.5,
             pill_visibility_mode: "auto_collapse".to_string(),
             pill_collapse_delay_s: 9,
+            pill_scale: 1.4,
         };
 
         let normalized = normalize(settings);
@@ -157,5 +179,18 @@ mod tests {
         assert_eq!(normalized.alert_threshold_pct, 73.5);
         assert_eq!(normalized.pill_visibility_mode, "auto_collapse");
         assert_eq!(normalized.pill_collapse_delay_s, 9);
+        assert_eq!(normalized.pill_scale, 1.4);
+    }
+
+    #[test]
+    fn clamps_pill_scale_out_of_range() {
+        let with_scale = |scale| Settings {
+            pill_scale: scale,
+            ..Default::default()
+        };
+
+        assert_eq!(normalize(with_scale(5.0)).pill_scale, PILL_SCALE_MAX);
+        assert_eq!(normalize(with_scale(0.1)).pill_scale, PILL_SCALE_MIN);
+        assert_eq!(normalize(with_scale(f64::NAN)).pill_scale, 1.0);
     }
 }
