@@ -19,6 +19,9 @@ Module map. Backend in `src/`, frontend in `dist/`. IPC = Tauri commands (async 
   `normalize()` against `SUPPORTED_PROVIDER_IDS`.
 - `notch.rs` — macOS-only, positions the Pill next to the physical notch via `objc2-app-kit`
   (`NSScreen.safeAreaInsets` / `auxiliaryTopLeftArea`).
+- `tray.rs` — one native status-bar icon per active provider. Menus are rebuilt from cached/merged
+  `UsageReport`s at startup, after settings saves, and after each usage refresh; tray PNGs live in
+  `dist/icons/tray/` and are rendered as macOS template icons.
 
 ## Frontend (`dist/`, static, no build step)
 
