@@ -6,6 +6,7 @@ mod credentials;
 mod notch;
 mod providers;
 mod settings;
+mod tray;
 
 use providers::{
     ClaudeProvider, CodexProvider, CopilotProvider, FetchError, UsageProvider, UsageReport,
@@ -26,8 +27,14 @@ fn get_settings() -> settings::Settings {
 }
 
 #[tauri::command]
-fn save_settings(settings: settings::Settings) {
+fn save_settings(settings: settings::Settings, app: tauri::AppHandle) {
     settings::save(&settings);
+    let reports = cache::load()
+        .map(|cached| cached.reports)
+        .unwrap_or_default();
+    if let Err(error) = tray::sync(&app, &settings, &reports) {
+        eprintln!("[tray] impossibile aggiornare le icone: {error}");
+    }
 }
 
 /// Chiamato dal frontend quando l'utente finisce di trascinare la pill
@@ -40,6 +47,34 @@ fn save_window_position(x: i32, y: i32) {
     settings::save(&s);
 }
 
+/// Centra la finestra sul bordo superiore del monitor primario. Estratta per
+/// essere riusata sia dal ramo di fallback in `setup()` (prima che il
+/// frontend misuri il DOM) sia dal comando `center_if_unpositioned`.
+fn center_on_primary_top(window: &tauri::WebviewWindow) {
+    if let Ok(Some(monitor)) = window.primary_monitor() {
+        let screen_size = monitor.size();
+        let scale = monitor.scale_factor();
+        if let Ok(win_size) = window.outer_size() {
+            let x = (screen_size.width as f64 / scale - win_size.width as f64 / scale) / 2.0;
+            let _ = window.set_position(tauri::Position::Logical(tauri::LogicalPosition::new(
+                x, 0.0,
+            )));
+        }
+    }
+}
+
+/// Ricentra la Pill dopo il primo `applyLayout()` del frontend, ma solo se
+/// l'utente non l'ha mai trascinata: a quel punto la larghezza della finestra
+/// riflette la scala scelta (`pill_scale`), cosa che il centraggio nel
+/// `setup()` — fatto sui 330x56 dichiarati — non può sapere. Con scale grandi
+/// senza questo la Pill nascerebbe vistosamente scentrata.
+#[tauri::command]
+fn center_if_unpositioned(window: tauri::WebviewWindow) {
+    if settings::load().window_position.is_none() {
+        center_on_primary_top(&window);
+    }
+}
+
 /// Interroga i provider in parallelo invece di tre round-trip separati dal
 /// frontend (vedi plan/step-1.4.md). `skip` sono gli id dei provider che il
 /// frontend ha già messo in backoff (plan/step-3.2.md): non vengono
@@ -49,7 +84,7 @@ fn save_window_position(x: i32, y: i32) {
 /// per i provider saltati, così non perde mai dati per un provider
 /// temporaneamente in backoff.
 #[tauri::command]
-async fn get_all_usage(skip: Vec<String>) -> Vec<UsageReport> {
+async fn get_all_usage(skip: Vec<String>, app: tauri::AppHandle) -> Vec<UsageReport> {
     let want = |id: &str| !skip.iter().any(|s| s == id);
 
     let (claude, codex, copilot) = tokio::join!(
@@ -66,6 +101,9 @@ async fn get_all_usage(skip: Vec<String>) -> Vec<UsageReport> {
         merged.push(report.clone());
     }
     cache::save(&merged);
+    if let Err(error) = tray::sync(&app, &settings::load(), &merged) {
+        eprintln!("[tray] impossibile aggiornare i consumi: {error}");
+    }
 
     fresh
 }
@@ -107,16 +145,8 @@ fn main() {
                     let _ = window.set_position(tauri::Position::Logical(
                         tauri::LogicalPosition::new(notch_x, 0.0),
                     ));
-                } else if let Ok(Some(monitor)) = window.primary_monitor() {
-                    let screen_size = monitor.size();
-                    let scale = monitor.scale_factor();
-                    if let Ok(win_size) = window.outer_size() {
-                        let x = (screen_size.width as f64 / scale - win_size.width as f64 / scale)
-                            / 2.0;
-                        let _ = window.set_position(tauri::Position::Logical(
-                            tauri::LogicalPosition::new(x, 0.0),
-                        ));
-                    }
+                } else {
+                    center_on_primary_top(&window);
                 }
             }
 
@@ -126,14 +156,26 @@ fn main() {
             // della sessione (issue #10). La nascondiamo invece di chiuderla,
             // così resta riutilizzabile da `openSettingsWindow()`.
             if let Some(settings_window) = app.get_webview_window("settings") {
+                use tauri::Emitter;
                 let hide_target = settings_window.clone();
+                let app_handle = app.handle().clone();
                 settings_window.on_window_event(move |event| {
                     if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                         api.prevent_close();
                         let _ = hide_target.hide();
+                        // Chiudere le Impostazioni senza salvare fa rileggere
+                        // alla Pill il valore persistito, annullando
+                        // l'anteprima live della scala. Innocuo se l'utente
+                        // aveva già salvato.
+                        let _ = app_handle.emit("settings-changed", ());
                     }
                 });
             }
+
+            let reports = cache::load()
+                .map(|cached| cached.reports)
+                .unwrap_or_default();
+            tray::sync(app.handle(), &settings::load(), &reports)?;
 
             Ok(())
         })
@@ -142,7 +184,8 @@ fn main() {
             get_cached_usage,
             get_settings,
             save_settings,
-            save_window_position
+            save_window_position,
+            center_if_unpositioned
         ])
         .run(tauri::generate_context!())
         .expect("errore durante l'avvio dell'applicazione Tauri");
