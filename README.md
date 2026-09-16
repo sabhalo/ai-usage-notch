@@ -1,145 +1,105 @@
 # AI Usage Notch
 
-AI Usage Notch è una piccola applicazione desktop che mostra, in una **Pill**
-sempre in primo piano, il consumo degli account **Claude**, **Codex** e
-**GitHub Copilot**. Le percentuali arrivano dalle credenziali già create dalle
-CLI ufficiali: non è necessario copiare API key nelle impostazioni dell'app.
+An always-on-top **Pill** that shows the usage of your **Claude**, **Codex** and
+**GitHub Copilot** accounts at a glance. Percentages come from the credentials
+the official CLIs already store on your machine, so there is no API key to paste
+anywhere.
 
-Il progetto usa [Tauri v2](https://v2.tauri.app/) con backend Rust e frontend
-HTML/CSS/JavaScript statico. Non richiede Node.js, npm o un passaggio di build
-per il frontend.
+Built with [Tauri v2](https://v2.tauri.app/): a Rust backend and a static
+HTML/CSS/JavaScript frontend, with no Node.js or frontend build step.
 
 > [!IMPORTANT]
-> Il progetto è alla versione `0.1.0` ed è **macOS-first**. Il bundle Windows
-> è configurato e viene compilato dalla pipeline di release, ma il porting è
-> ancora in fase di verifica end-to-end. Linux non è attualmente un target di
-> distribuzione supportato.
+> Version `0.1.0`, **macOS-first**. The Windows bundle is built by the release
+> pipeline but is not yet verified end to end. Linux is not a supported
+> distribution target.
 
-## Indice
+## Table of contents
 
-- [Perché esiste](#perché-esiste)
-- [Funzionalità](#funzionalità)
-- [Provider e credenziali](#provider-e-credenziali)
-- [Requisiti](#requisiti)
-- [Installazione e avvio](#installazione-e-avvio)
-- [Utilizzo](#utilizzo)
-- [Impostazioni](#impostazioni)
-- [Comandi e script](#comandi-e-script)
-- [Architettura](#architettura)
-- [Dati locali, privacy e sicurezza](#dati-locali-privacy-e-sicurezza)
-- [Test e qualità](#test-e-qualità)
-- [Build e release](#build-e-release)
-- [Aggiungere un provider](#aggiungere-un-provider)
-- [Risoluzione dei problemi](#risoluzione-dei-problemi)
-- [Storia del progetto](#storia-del-progetto)
-- [Contribuire](#contribuire)
-- [Limiti noti](#limiti-noti)
-- [Licenza](#licenza)
+- [Features](#features)
+- [Providers and credentials](#providers-and-credentials)
+- [Requirements](#requirements)
+- [Install and run](#install-and-run)
+- [Usage](#usage)
+- [Settings](#settings)
+- [Architecture](#architecture)
+- [Development](#development)
+- [Privacy and security](#privacy-and-security)
+- [Troubleshooting](#troubleshooting)
+- [Contributing](#contributing)
+- [Known limitations](#known-limitations)
+- [License](#license)
 
-## Perché esiste
+## Features
 
-Claude, Codex e Copilot espongono finestre di utilizzo differenti e mostrano
-le rispettive quote in interfacce separate. AI Usage Notch nasce per riunire
-queste informazioni in un indicatore discreto, sempre raggiungibile e senza
-richiedere un altro servizio remoto.
+- Parallel monitoring of Claude, Codex and GitHub Copilot.
+- Provider-specific usage percentages and reset windows.
+- On-disk cache of the last known data, shown immediately at startup.
+- Independent per-provider backoff (`30 s`, `5 min`, `15 min`) on error, honoring
+  the `Retry-After` header on rate limits.
+- Configurable automatic refresh plus an immediate manual refresh.
+- Visual distinction between a never-configured provider, stale data and an
+  error after a previous success.
+- Visual alert and system notification past a configurable threshold.
+- **Always** and **Auto-collapse** visibility modes.
+- Configurable Pill scale (70%–200%) that resizes the Pill and its Panel alike.
+- Draggable, persisted Pill position; initial placement next to the physical
+  notch on compatible Macs.
+- Automatic launch at login.
 
-La **Pill** mostra un anello per ogni provider attivo. Selezionando un anello
-si apre il relativo **Panel**, con le finestre di utilizzo, il tempo al reset e
-gli eventuali stati `unlimited` o `overage`.
+The **Pill** shows one ring per active provider. Clicking a ring opens its
+**Panel**, with the per-window usage bars, the time to reset and any `unlimited`
+or `overage` state.
 
-## Funzionalità
+## Providers and credentials
 
-- monitoraggio parallelo di Claude, Codex e GitHub Copilot;
-- percentuali e finestre di reset specifiche per provider;
-- cache su disco dell'ultimo dato disponibile, caricata immediatamente
-  all'avvio;
-- backoff indipendente per provider (`30 s`, `5 min`, `15 min`) in caso di
-  errore, con rispetto del `Retry-After` sui rate limit;
-- refresh automatico configurabile e refresh manuale immediato;
-- distinzione visiva tra provider mai configurato, dato non aggiornato ed
-  errore dopo un precedente funzionamento;
-- avviso visivo e notifica di sistema oltre una soglia configurabile;
-- modalità di visibilità **Always** e **Auto-collapse**;
-- posizione della Pill trascinabile e persistita;
-- avvio automatico al login tramite plugin Tauri;
-- posizionamento iniziale accanto alla notch fisica sui Mac compatibili;
-- test dei parser completamente offline, basati su risposte reali salvate
-  nelle fixture.
+The app has no field to paste a token into. It looks for local credentials in
+this order:
 
-## Provider e credenziali
-
-L'app non offre un campo in cui incollare token. Cerca invece le credenziali
-locali in questo ordine:
-
-| Provider | Origine credenziali | Come prepararle |
+| Provider | Credential source | How to prepare it |
 | --- | --- | --- |
-| Claude | macOS: Keychain, voce `Claude Code-credentials`; altri sistemi: `~/.claude/.credentials.json` | Eseguire `claude login` |
-| Codex | `~/.codex/auth.json` (`access_token` e `account_id`) | Eseguire `codex login` |
-| GitHub Copilot | `gh auth token`, poi `GITHUB_TOKEN`, poi `GH_TOKEN` | Eseguire `gh auth login` e avere accesso a Copilot |
+| Claude | macOS: Keychain item `Claude Code-credentials`; other systems: `~/.claude/.credentials.json` | Run `claude login` |
+| Codex | `~/.codex/auth.json` (`access_token` and `account_id`) | Run `codex login` |
+| GitHub Copilot | `gh auth token`, then `GITHUB_TOKEN`, then `GH_TOKEN` | Run `gh auth login` with Copilot access |
 
-È sufficiente configurare un solo provider. Quelli senza credenziali valide
-restano grigi e non impediscono agli altri di funzionare; possono anche essere
-disattivati dalla finestra delle impostazioni.
+Configuring a single provider is enough. Providers without valid credentials
+stay grey and can also be disabled from the settings window.
 
-Gli endpoint interrogati non sono API pubbliche e stabili dedicate a questo
-progetto. Formati e date dell'ultima verifica sono documentati in
+The queried endpoints are undocumented and not dedicated to this project.
+Formats and last-verified dates are recorded in
 [`docs/endpoints.md`](docs/endpoints.md).
 
-## Requisiti
+## Requirements
 
-### Comuni
+**Common**
 
-- [Git](https://git-scm.com/);
-- toolchain Rust stabile installata tramite [rustup](https://rustup.rs/);
-- Tauri CLI v2;
-- almeno una credenziale locale valida, normalmente ottenuta autenticando
-  Claude Code, Codex o GitHub CLI.
+- [Git](https://git-scm.com/)
+- A stable Rust toolchain via [rustup](https://rustup.rs/)
+- Tauri CLI v2: `cargo install tauri-cli --version "^2" --locked`
+- At least one valid local credential (Claude Code, Codex or the GitHub CLI)
 
-Installare Tauri CLI con:
+Node.js and npm are not needed.
 
-```sh
-cargo install tauri-cli --version "^2" --locked
-```
+**macOS**
 
-Non servono Node.js e npm.
+- macOS with the system WebKit
+- Xcode Command Line Tools: `xcode-select --install`
 
-### macOS
+**Windows**
 
-- macOS con WebKit di sistema;
-- Xcode Command Line Tools:
-
-  ```sh
-  xcode-select --install
-  ```
-
-La lettura di Claude usa il comando di sistema `security`. La lettura di
-Copilot cerca `gh` nel `PATH`, `/opt/homebrew/bin/gh` e
-`/usr/local/bin/gh`, così funziona anche quando l'app viene aperta dal Finder.
-
-### Windows
-
-- Windows 10 o 11;
+- Windows 10 or 11
 - [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/)
-  con il workload **Sviluppo di applicazioni desktop con C++**;
-- [Microsoft Edge WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/),
-  normalmente già presente sui sistemi recenti.
+  with the **Desktop development with C++** workload
+- [Microsoft Edge WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/)
+  (usually already present)
 
-Il supporto Windows è ancora sperimentale; vedere la
-[mappa del porting](https://github.com/sabhalo/ai-usage-notch/issues/12) per
-lo stato aggiornato.
-
-## Installazione e avvio
-
-### 1. Clonare il repository
+## Install and run
 
 ```sh
 git clone https://github.com/sabhalo/ai-usage-notch.git
 cd ai-usage-notch
 ```
 
-### 2. Preparare almeno un provider
-
-Eseguire uno o più login, in base ai servizi da visualizzare:
+Prepare at least one provider:
 
 ```sh
 claude login
@@ -147,375 +107,210 @@ codex login
 gh auth login
 ```
 
-### 3. Avviare in sviluppo
+Run in development:
 
 ```sh
 cargo tauri dev
 ```
 
-Tauri compila il backend Rust e apre la Pill usando direttamente i file in
-`dist/`. La prima compilazione può richiedere alcuni minuti.
-
-### 4. Creare un'app installabile
+Build an installable app:
 
 ```sh
 cargo tauri build
 ```
 
-Gli artefatti vengono creati sotto `target/release/bundle/`:
+Artifacts are created under `target/release/bundle/`:
 
-- macOS: applicazione in `macos/` e immagine `.dmg` in `dmg/`;
-- Windows: installer NSIS `.exe` in `nsis/`.
+- macOS: application in `macos/` and a `.dmg` in `dmg/`
+- Windows: an NSIS `.exe` installer in `nsis/`
 
-Su macOS aprire il `.dmg` e trascinare l'app in `Applicazioni`. Su Windows
-eseguire l'installer NSIS. Se non sono ancora presenti artefatti nella pagina
-[Releases](https://github.com/sabhalo/ai-usage-notch/releases), la build da
-sorgenti è il metodo di installazione previsto.
+If there are no artifacts on the
+[Releases](https://github.com/sabhalo/ai-usage-notch/releases) page yet,
+building from source is the intended installation method.
 
-## Utilizzo
+## Usage
 
-| Azione | Risultato |
+| Action | Result |
 | --- | --- |
-| Click sinistro su un anello | Apre o chiude il Panel del provider |
-| Click destro sulla Pill | Forza subito il refresh di tutti i provider attivi e ignora il backoff corrente |
-| Hover su una Pill Collapsed | Esegue il Wake e riporta la Pill a Visible |
-| Trascinamento della Pill | Sposta la finestra e salva la nuova posizione |
-| Click sull'ingranaggio | Apre le impostazioni |
+| Left click on a ring | Opens or closes that provider's Panel |
+| Right click on the Pill | Forces an immediate refresh of every active provider, ignoring the current backoff |
+| Hover on a collapsed Pill | Returns the Pill to its full size |
+| Drag the Pill | Moves the window and saves the new position |
+| Click the gear | Opens the settings |
 
-Il Panel si chiude dopo 7 secondi di inattività o quando la finestra perde il
-focus. Un Panel Open mantiene sempre la Pill Visible.
+The Panel closes after 7 seconds of inactivity or when the window loses focus.
+An open Panel always keeps the Pill visible.
 
-### Significato degli stati
+**Ring states**
 
-- verde: consumo inferiore al 70%;
-- ambra: consumo dal 70% all'89%;
-- rosso: consumo dal 90% o errore di un provider che aveva già funzionato;
-- viola con `∞`: piano o quota illimitata;
-- grigio con `–`: provider non configurato;
-- aspetto attenuato: dato in cache vecchio di oltre 10 minuti o ultimo dato
-  mantenuto durante un rate limit;
-- pulsazione: soglia di allerta raggiunta.
+- Green: usage below 70%
+- Amber: usage from 70% to 89%
+- Red: usage at 90% or above, or an error from a provider that had worked before
+- Purple with `∞`: unlimited plan or quota
+- Grey with `–`: provider not configured
+- Dimmed: cached data older than 10 minutes, or the last value kept during a
+  rate limit
+- Pulsing: alert threshold reached
 
-La notifica di soglia viene inviata una sola volta per ciclo di utilizzo. Un
-calo della percentuale indica il reset della finestra e riabilita la notifica.
+The threshold notification is sent once per usage cycle; a drop in the
+percentage means the window reset and re-arms it.
 
-## Impostazioni
+## Settings
 
-| Impostazione | Default | Note |
+| Setting | Default | Notes |
 | --- | ---: | --- |
-| Provider attivi | Tutti | Claude, Codex e Copilot sono configurabili separatamente |
-| Intervallo refresh | 300 secondi | Minimo 30 secondi nell'interfaccia |
-| Soglia di allerta | 80% | Valore tra 1 e 100 |
-| Visibility mode | `Always` | `Auto-collapse` abilita il collasso per inattività |
-| Ritardo Auto-collapse | 3 secondi | Usato solo in modalità `Auto-collapse` |
-| Avvia al login | Gestito dal sistema operativo | Non viene duplicato in `settings.json` |
+| Active providers | All | Claude, Codex and Copilot are toggled separately |
+| Refresh interval | 300 s | Minimum 30 s |
+| Alert threshold | 80% | Between 1 and 100 |
+| Scale | 100% | Continuous, 70%–200%; resizes the Pill and Panel |
+| Visibility mode | Always | `Auto-collapse` collapses the Pill on inactivity |
+| Auto-collapse delay | 3 s | Used only in `Auto-collapse` mode |
+| Launch at login | Managed by the OS | Not stored in `settings.json` |
 
-La posizione della finestra viene salvata automaticamente. In assenza di una
-posizione salvata, macOS tenta di allineare la Pill al bordo sinistro della
-notch fisica; in alternativa la posiziona al centro del bordo superiore del
-monitor principale.
+The window position is saved automatically. Without a saved position, macOS
+tries to align the Pill with the left edge of the physical notch; otherwise it
+centers it on the top edge of the primary monitor.
 
-## Comandi e script
-
-Non sono presenti `package.json`, `Makefile` o `justfile`: il progetto usa
-Cargo e Cargo Tauri direttamente.
-
-| Comando | Scopo |
-| --- | --- |
-| `cargo tauri dev` | Compila e avvia l'app in modalità sviluppo |
-| `cargo tauri build` | Crea il binario release e i bundle installabili |
-| `cargo build` | Compila il backend senza creare bundle |
-| `cargo test` | Esegue l'intera suite offline |
-| `cargo test --locked` | Esegue i test usando esattamente `Cargo.lock`, come in CI |
-| `cargo fmt` | Formatta il codice Rust |
-| `cargo fmt --check` | Verifica la formattazione senza modificare file |
-| `cargo clippy --all-targets -- -D warnings` | Esegue l'analisi statica trattando ogni warning come errore |
-| `./scripts/probe.sh` | Interroga manualmente i tre endpoint su macOS/Linux |
-| `powershell -ExecutionPolicy Bypass -File .\scripts\probe.ps1` | Interroga manualmente i tre endpoint su Windows |
-
-Lo script shell richiede `curl` e `jq`. Entrambi gli script stampano il JSON
-ricevuto ma non stampano mai il token. Le risposte possono comunque contenere
-metadati dell'account: controllarle prima di condividerle.
-
-## Architettura
+## Architecture
 
 ```mermaid
 flowchart LR
-    UI[Frontend statico<br/>Pill, Panel, Settings] <-->|Comandi Tauri| APP[Backend Rust]
-    APP --> CREDS[Credenziali locali]
-    APP --> PROVIDERS[Provider fetcher<br/>Claude · Codex · Copilot]
-    PROVIDERS --> APIS[Endpoint di usage]
+    UI[Static frontend<br/>Pill, Panel, Settings] <-->|Tauri commands| APP[Rust backend]
+    APP --> CREDS[Local credentials]
+    APP --> PROVIDERS[Provider fetchers<br/>Claude · Codex · Copilot]
+    PROVIDERS --> APIS[Usage endpoints]
     APP <--> CACHE[cache.json]
     APP <--> SETTINGS[settings.json]
 ```
 
-### Backend Rust
+**Rust backend (`src/`)**
 
-- `src/main.rs`: superficie IPC Tauri, fetch parallele, setup delle finestre
-  e posizionamento iniziale;
-- `src/providers/`: contratto `UsageProvider`, tipi condivisi, parser e un
-  modulo per provider;
-- `src/credentials.rs`: risoluzione locale dei token per piattaforma;
-- `src/cache.rs`: persistenza best-effort dell'ultimo report disponibile;
-- `src/settings.rs`: caricamento, normalizzazione e salvataggio delle
-  preferenze;
-- `src/notch.rs`: rilevamento macOS della safe area della notch tramite
-  `objc2-app-kit`.
+- `main.rs` — Tauri IPC surface, parallel fetches, window setup and placement
+- `providers/` — the `UsageProvider` contract, shared types, parsers and one
+  module per provider
+- `credentials.rs` — per-platform local token resolution
+- `cache.rs` — best-effort persistence of the last report
+- `settings.rs` — loading, normalization and saving of preferences
+- `notch.rs` — macOS notch safe-area detection via `objc2-app-kit`
 
-I comandi esposti al frontend sono:
-
-| Comando IPC | Responsabilità |
-| --- | --- |
-| `get_cached_usage` | Restituisce l'ultimo snapshot salvato |
-| `get_settings` | Carica le impostazioni normalizzate |
-| `save_settings` | Salva le impostazioni |
-| `save_window_position` | Persiste le coordinate della Pill |
-| `get_all_usage` | Interroga in parallelo i provider dovuti e aggiorna la cache |
-
-### Frontend statico
-
-- `dist/index.html`, `dist/main.js`, `dist/style.css`: Pill, Panel, polling,
-  backoff, notifiche e layout;
-- `dist/settings.html`, `dist/settings.js`, `dist/settings.css`: finestra
-  delle impostazioni;
-- `dist/icons/`: risorse grafiche dei provider.
-
-Il frontend non ha una pipeline propria: modificare un file sotto `dist/`
-aggiorna direttamente ciò che Tauri serve in sviluppo e inserisce nel bundle.
-
-### Struttura del repository
+**Static frontend (`dist/`)** — `index.html` / `main.js` / `style.css` for the
+Pill, Panel, polling, backoff and notifications; `settings.*` for the settings
+window; `icons/` for provider graphics. Editing a file under `dist/` directly
+changes what Tauri serves and bundles.
 
 ```text
 .
-├── .github/workflows/release.yml  # release automatica su tag v*
-├── capabilities/default.json      # permessi Tauri delle due finestre
-├── dist/                          # frontend statico
-├── docs/                          # endpoint e convenzioni di progetto
-├── fixtures/                      # payload reali usati dai test offline
-├── icons/                         # icone dei bundle desktop
-├── scripts/                       # probe manuali Bash e PowerShell
-├── src/                           # backend Rust
-├── Cargo.toml                     # crate, dipendenze e profilo release
-├── CONTEXT.md                     # vocabolario canonico Pill/Panel
-└── tauri.conf.json                # finestre, bundle e configurazione Tauri
+├── .github/workflows/release.yml  # release on v* tags
+├── capabilities/default.json      # Tauri window permissions
+├── dist/                          # static frontend
+├── docs/                          # endpoints and project conventions
+├── fixtures/                      # real payloads for the offline tests
+├── icons/                         # desktop bundle icons
+├── scripts/                       # manual Bash and PowerShell probes
+├── src/                           # Rust backend
+├── CONTEXT.md                     # canonical Pill/Panel vocabulary
+└── tauri.conf.json                # windows, bundle and Tauri config
 ```
 
-## Dati locali, privacy e sicurezza
+## Development
 
-AI Usage Notch non ha un backend remoto proprio. I token vengono letti al
-momento della richiesta e inviati soltanto all'endpoint del relativo provider;
-non vengono scritti nella cache, nelle impostazioni o nei messaggi di errore.
+There is no `package.json`, `Makefile` or `justfile`; the project uses Cargo and
+Cargo Tauri directly.
 
-L'app salva due file nella directory dati utente del sistema:
-
-| File | Contenuto |
+| Command | Purpose |
 | --- | --- |
-| `ai-usage-notch/settings.json` | Provider attivi, refresh, soglia, visibility mode, ritardo e posizione |
-| `ai-usage-notch/cache.json` | Timestamp e ultimo report per i provider supportati, mai credenziali |
+| `cargo tauri dev` | Compile and run in development |
+| `cargo tauri build` | Build the release binary and bundles |
+| `cargo test` | Run the offline test suite |
+| `cargo fmt --check` | Check formatting |
+| `cargo clippy --all-targets -- -D warnings` | Static analysis, warnings as errors |
+| `./scripts/probe.sh` / `scripts/probe.ps1` | Query the three endpoints manually |
 
-Percorsi tipici della directory base:
+Before proposing a change, run `cargo fmt --check`, `cargo test`,
+`cargo clippy --all-targets -- -D warnings` and `cargo build`. The release
+pipeline runs the tests, Clippy and `cargo tauri build` on macOS and Windows;
+there is no CI on ordinary pushes or pull requests, so run these locally.
 
-- macOS: `~/Library/Application Support/`;
-- Windows: `%APPDATA%`;
-- Linux, se eseguito manualmente: `$XDG_DATA_HOME` oppure `~/.local/share/`.
+Provider tests read `fixtures/<provider>-usage.json` and never touch the network
+or the user's real credentials.
 
-In una build di debug il body grezzo di una risposta con formato inatteso può
-essere scritto su `stderr` per la diagnosi. Non viene persistito dall'app.
+Pushing a tag that starts with `v` triggers `.github/workflows/release.yml`,
+which builds on `macos-latest` and `windows-latest` and attaches the `.dmg` and
+NSIS `.exe` to the matching GitHub Release.
 
-## Test e qualità
+To add a provider: create `src/providers/<id>.rs` (struct, `UsageProvider` impl,
+parser, fixture tests), register it in `src/providers/mod.rs` and add it to
+`SUPPORTED_PROVIDER_IDS` and the `tokio::join!` in `get_all_usage`, mirror the id
+in `PROVIDER_IDS` in `dist/main.js`, add a fixture and the UI pieces under
+`dist/`, and document the endpoint in `docs/endpoints.md`.
 
-I test dei provider leggono i file `fixtures/<provider>-usage.json` e non
-contattano la rete. Non devono accedere né alle credenziali né ai file reali
-dell'utente.
+## Privacy and security
 
-Prima di proporre una modifica eseguire:
+AI Usage Notch has no remote backend of its own. Tokens are read at request time
+and sent only to the matching provider endpoint; they are never written to the
+cache, the settings or the error messages.
 
-```sh
-cargo fmt --check
-cargo test
-cargo clippy --all-targets -- -D warnings
-cargo build
-```
+Two files are saved in the system's user data directory (`~/Library/Application
+Support/` on macOS, `%APPDATA%` on Windows):
 
-La pipeline di release esegue `cargo test --locked`, Clippy e
-`cargo tauri build` su macOS e Windows. Al momento non esiste un workflow CI
-per i normali push o per le pull request, quindi questi controlli vanno
-eseguiti localmente.
+| File | Content |
+| --- | --- |
+| `ai-usage-notch/settings.json` | Active providers, refresh, threshold, scale, visibility mode, delay and position |
+| `ai-usage-notch/cache.json` | Timestamp and last report per provider, never credentials |
 
-## Build e release
+The Windows installer is not signed, so SmartScreen may warn on first run. On
+macOS the transparent window uses `macos-private-api`, which rules out Mac App
+Store distribution.
 
-Il profilo release abilita LTO, una sola codegen unit, ottimizzazione per le
-dimensioni e `panic = "abort"`.
+## Troubleshooting
 
-Un push di un tag che inizia con `v` attiva
-`.github/workflows/release.yml`. Il workflow:
+**A provider is grey** — its credential was not found or is empty. Repeat the
+login for that CLI and restart the app.
 
-1. compila e testa su `macos-latest` e `windows-latest`;
-2. crea i bundle Tauri;
-3. allega `.dmg` e installer NSIS `.exe` alla GitHub Release associata.
+**Claude shows as not authenticated on macOS after login** — the Keychain can
+hold more than one `Claude Code-credentials` item, and a stale MCP-only one may
+be picked. In Keychain Access, remove the stale item after checking its
+contents, then repeat `claude login`.
 
-Esempio per un maintainer:
+**Copilot cannot find `gh`** — check `gh auth status` and `gh auth token`, or
+launch the app with `GITHUB_TOKEN` / `GH_TOKEN` set. The token must belong to an
+account with Copilot access.
 
-```sh
-git tag v0.1.0
-git push origin v0.1.0
-```
+**"response received but no recognised field"** — an undocumented endpoint
+likely changed format. Run `scripts/probe.sh` (or `probe.ps1`), compare with
+`docs/endpoints.md`, update the parser under `src/providers/` and refresh the
+fixture with a sanitized real payload.
 
-> [!WARNING]
-> L'installer Windows non è firmato. SmartScreen può mostrare “Windows ha
-> protetto il PC”; verificare sempre provenienza e checksum prima di scegliere
-> **Ulteriori informazioni → Esegui comunque**.
+**The data looks old** — the cache is shown at startup and marked stale after 10
+minutes. A provider in error follows its backoff; right-click the Pill to force
+an immediate attempt.
 
-Su macOS la finestra trasparente usa `macos-private-api`. Questa scelta rende
-possibile la Pill, ma esclude la distribuzione tramite Mac App Store.
+## Contributing
 
-## Aggiungere un provider
+Issues and specs live in the
+[GitHub tracker](https://github.com/sabhalo/ai-usage-notch/issues). The working
+branch is `develop`; integration pull requests target `main`.
 
-L'elenco autorevole del backend è `SUPPORTED_PROVIDER_IDS` in
-`src/providers/mod.rs`; il frontend mantiene la lista speculare
-`PROVIDER_IDS` in `dist/main.js`.
+1. Open or pick an issue with context and acceptance criteria.
+2. Branch from `develop`.
+3. Keep the tests offline; do not read real user data in tests.
+4. Run formatting, tests, Clippy and build.
+5. Open a pull request against `main`, linking the issue.
 
-Per aggiungere un provider:
+The domain vocabulary is defined in [`CONTEXT.md`](CONTEXT.md); agent
+conventions are in [`AGENTS.md`](AGENTS.md) and `docs/agents/`.
 
-1. creare `src/providers/<id>.rs` con struttura, implementazione di
-   `UsageProvider`, parser e test su fixture;
-2. registrare modulo ed export in `src/providers/mod.rs`, aggiornare
-   `SUPPORTED_PROVIDER_IDS` e aggiungere il provider al `tokio::join!` di
-   `get_all_usage`;
-3. aggiungere una risposta reale in `fixtures/<id>-usage.json`;
-4. aggiungere icona, anello, titoli e stato in `dist/`;
-5. aggiungere il checkbox nella finestra impostazioni;
-6. documentare endpoint e payload in `docs/endpoints.md`;
-7. eseguire l'intera checklist di qualità.
+## Known limitations
 
-Impostazioni e cache filtrano automaticamente i provider sconosciuti durante
-caricamento e salvataggio, evitando che integrazioni rimosse restino nei file
-dell'utente.
+- The usage endpoints are undocumented and can change without notice.
+- Windows is built by the pipeline but not yet verified end to end.
+- Linux has no configured bundle target.
+- The Windows installers are not signed.
+- No automatic updater.
+- No CI on ordinary pushes and pull requests yet.
 
-## Risoluzione dei problemi
+## License
 
-### Un provider è grigio
-
-La relativa credenziale non è stata trovata o è vuota. Ripetere il login della
-CLI interessata e riavviare l'app:
-
-```sh
-claude login
-codex login
-gh auth login
-```
-
-### Claude risulta non autenticato su macOS dopo il login
-
-Nel Keychain possono esistere più voci chiamate `Claude Code-credentials`.
-Una vecchia voce contenente solo dati MCP può essere scelta al posto di quella
-OAuth. Aprire **Accesso Portachiavi**, individuare i duplicati e rimuovere solo
-la voce obsoleta dopo averne verificato il contenuto; quindi ripetere
-`claude login`.
-
-### Copilot non trova `gh`
-
-Verificare prima:
-
-```sh
-gh auth status
-gh auth token
-```
-
-In alternativa avviare l'app con `GITHUB_TOKEN` o `GH_TOKEN` nell'ambiente.
-Il token deve appartenere a un account con accesso a GitHub Copilot.
-
-### Compare “response received but no recognised field”
-
-È probabile che un endpoint non documentato abbia cambiato formato:
-
-```sh
-./scripts/probe.sh
-```
-
-Su Windows:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\probe.ps1
-```
-
-Confrontare l'output con `docs/endpoints.md`, aggiornare il parser sotto
-`src/providers/` e sostituire la fixture con un payload reale sanificato.
-
-### I dati sembrano vecchi
-
-La cache viene mostrata subito all'avvio e marcata come stale dopo 10 minuti.
-Un provider in errore segue il proprio backoff; il click destro sulla Pill
-forza un tentativo immediato.
-
-### La build Tauri non parte
-
-- verificare `rustc --version` e `cargo tauri --version`;
-- su macOS verificare `xcode-select -p`;
-- su Windows verificare l'installazione del workload C++ e di WebView2;
-- eseguire `cargo build` per isolare prima eventuali errori Rust dal bundling.
-
-## Storia del progetto
-
-- **28 agosto 2026 — primo prototipo.** Nasce l'app Tauri con Pill statica,
-  backend Rust e lettura delle quote Claude e Codex.
-- **30 agosto 2026 — base operativa.** Arrivano GitHub Copilot, parser su
-  fixture reali, cache, backoff per provider, errori tipizzati, refresh
-  manuale, notifiche, impostazioni, trascinamento persistente e workflow di
-  release macOS/Windows.
-- **30 agosto 2026 — vocabolario e visibilità.** La vecchia modalità compact
-  via doppio click viene rimossa. Nascono i due assi indipendenti: Pill
-  Visible/Collapsed e Panel Open/Closed, con modalità Always e Auto-collapse.
-- **31 agosto 2026 — esperimento Gemini.** Viene implementato un quarto
-  provider tramite una sessione locale Antigravity e viene studiato anche
-  l'endpoint Gemini CLI.
-- **1 settembre 2026 — consolidamento.** Gemini viene rimosso deliberatamente;
-  la fonte dei provider supportati viene centralizzata e cache e impostazioni
-  vengono normalizzate per mantenere soltanto Claude, Codex e Copilot. Nello
-  stesso periodo vengono formalizzate architettura e convenzioni per gli
-  agenti di sviluppo.
-- **Stato attuale.** macOS resta la piattaforma principale; la verifica del
-  porting nativo Windows 11 è tracciata nelle issue del repository.
-
-La cronologia dettagliata è disponibile nei
-[commit](https://github.com/sabhalo/ai-usage-notch/commits/main/) e nelle
-[issue](https://github.com/sabhalo/ai-usage-notch/issues).
-
-## Contribuire
-
-Issue e specifiche vivono nel tracker GitHub di
-[`sabhalo/ai-usage-notch`](https://github.com/sabhalo/ai-usage-notch/issues).
-Il branch di lavoro è `develop`; le pull request di integrazione puntano a
-`main`.
-
-Flusso consigliato:
-
-1. aprire o scegliere una issue con contesto e criteri di accettazione;
-2. creare un branch da `develop`;
-3. mantenere i test offline e non leggere dati reali dell'utente nei test;
-4. eseguire formattazione, test, Clippy e build;
-5. aprire una pull request verso `main`, indicando la issue collegata.
-
-Il vocabolario di dominio è definito in [`CONTEXT.md`](CONTEXT.md). Le
-convenzioni destinate agli agenti sono in [`AGENTS.md`](AGENTS.md) e
-`docs/agents/`.
-
-## Limiti noti
-
-- gli endpoint di utilizzo sono non documentati e possono cambiare senza
-  preavviso;
-- Windows è compilato dalla pipeline ma non è ancora considerato verificato
-  end-to-end;
-- Linux non dispone di un target bundle configurato;
-- gli installer Windows non sono firmati;
-- la private API usata dalla finestra trasparente impedisce la pubblicazione
-  sul Mac App Store;
-- non è presente un updater automatico;
-- non esiste ancora CI sui normali push e sulle pull request.
-
-## Licenza
-
-Il repository non contiene ancora un file `LICENSE`. In assenza di una licenza
-esplicita, il codice non può essere considerato open source né riutilizzato o
-redistribuito automaticamente. Prima di farlo, contattare il maintainer o
-attendere l'aggiunta di una licenza.
+The repository does not yet contain a `LICENSE` file. Without an explicit
+license the code is not open source and cannot be reused or redistributed.
+Contact the maintainer or wait for a license to be added.

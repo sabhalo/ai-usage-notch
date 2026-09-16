@@ -47,6 +47,34 @@ fn save_window_position(x: i32, y: i32) {
     settings::save(&s);
 }
 
+/// Centra la finestra sul bordo superiore del monitor primario. Estratta per
+/// essere riusata sia dal ramo di fallback in `setup()` (prima che il
+/// frontend misuri il DOM) sia dal comando `center_if_unpositioned`.
+fn center_on_primary_top(window: &tauri::WebviewWindow) {
+    if let Ok(Some(monitor)) = window.primary_monitor() {
+        let screen_size = monitor.size();
+        let scale = monitor.scale_factor();
+        if let Ok(win_size) = window.outer_size() {
+            let x = (screen_size.width as f64 / scale - win_size.width as f64 / scale) / 2.0;
+            let _ = window.set_position(tauri::Position::Logical(tauri::LogicalPosition::new(
+                x, 0.0,
+            )));
+        }
+    }
+}
+
+/// Ricentra la Pill dopo il primo `applyLayout()` del frontend, ma solo se
+/// l'utente non l'ha mai trascinata: a quel punto la larghezza della finestra
+/// riflette la scala scelta (`pill_scale`), cosa che il centraggio nel
+/// `setup()` — fatto sui 330x56 dichiarati — non può sapere. Con scale grandi
+/// senza questo la Pill nascerebbe vistosamente scentrata.
+#[tauri::command]
+fn center_if_unpositioned(window: tauri::WebviewWindow) {
+    if settings::load().window_position.is_none() {
+        center_on_primary_top(&window);
+    }
+}
+
 /// Interroga i provider in parallelo invece di tre round-trip separati dal
 /// frontend (vedi plan/step-1.4.md). `skip` sono gli id dei provider che il
 /// frontend ha già messo in backoff (plan/step-3.2.md): non vengono
@@ -117,16 +145,8 @@ fn main() {
                     let _ = window.set_position(tauri::Position::Logical(
                         tauri::LogicalPosition::new(notch_x, 0.0),
                     ));
-                } else if let Ok(Some(monitor)) = window.primary_monitor() {
-                    let screen_size = monitor.size();
-                    let scale = monitor.scale_factor();
-                    if let Ok(win_size) = window.outer_size() {
-                        let x = (screen_size.width as f64 / scale - win_size.width as f64 / scale)
-                            / 2.0;
-                        let _ = window.set_position(tauri::Position::Logical(
-                            tauri::LogicalPosition::new(x, 0.0),
-                        ));
-                    }
+                } else {
+                    center_on_primary_top(&window);
                 }
             }
 
@@ -136,11 +156,18 @@ fn main() {
             // della sessione (issue #10). La nascondiamo invece di chiuderla,
             // così resta riutilizzabile da `openSettingsWindow()`.
             if let Some(settings_window) = app.get_webview_window("settings") {
+                use tauri::Emitter;
                 let hide_target = settings_window.clone();
+                let app_handle = app.handle().clone();
                 settings_window.on_window_event(move |event| {
                     if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                         api.prevent_close();
                         let _ = hide_target.hide();
+                        // Chiudere le Impostazioni senza salvare fa rileggere
+                        // alla Pill il valore persistito, annullando
+                        // l'anteprima live della scala. Innocuo se l'utente
+                        // aveva già salvato.
+                        let _ = app_handle.emit("settings-changed", ());
                     }
                 });
             }
@@ -157,7 +184,8 @@ fn main() {
             get_cached_usage,
             get_settings,
             save_settings,
-            save_window_position
+            save_window_position,
+            center_if_unpositioned
         ])
         .run(tauri::generate_context!())
         .expect("errore durante l'avvio dell'applicazione Tauri");

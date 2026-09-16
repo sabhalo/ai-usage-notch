@@ -31,7 +31,13 @@
   </section>
 
   <section>
-    <h2>Visibilità della pill</h2>
+    <h2>Aspetto della pill</h2>
+    <label class="row">Grandezza
+      <span class="slider-wrap">
+        <input type="range" id="pill-scale" min="70" max="200" step="5" />
+        <output id="pill-scale-out">100%</output>
+      </span>
+    </label>
     <label class="row">Modalità
       <select id="pill-visibility-mode">
         <option value="always">Sempre visibile</option>
@@ -50,7 +56,7 @@
 
   <div class="actions">
     <button id="save-btn">Salva</button>
-    <span class="hint" id="hint" hidden>Salvato — riavvia l'app per applicare provider/intervallo.</span>
+    <span class="hint" id="hint" hidden>Impostazioni salvate.</span>
   </div>
 
 <script src="settings.js"></script>

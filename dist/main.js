@@ -50,6 +50,22 @@ let pillCollapseDelayMs = 3000;
 let pillCollapsed = false;
 let pillCollapseTimer = null;
 
+// Scala della Pill (vedi CONTEXT.md: "Scale"): moltiplicatore continuo
+// applicato a tutte le misure via la custom property --pill-scale, che pilota
+// html { font-size } in style.css. Non è una densità: vale identica in
+// entrambe le modalità di Visibilità.
+const PILL_SCALE_MIN = 0.7;
+const PILL_SCALE_MAX = 2.0;
+let pillScale = 1;
+
+// Clamp lato frontend con gli stessi limiti del backend (difesa in
+// profondità; serve comunque all'anteprima live, che non passa da normalize()).
+function applyPillScale(v) {
+  const n = Number(v);
+  pillScale = Number.isFinite(n) ? Math.min(PILL_SCALE_MAX, Math.max(PILL_SCALE_MIN, n)) : 1;
+  document.documentElement.style.setProperty("--pill-scale", String(pillScale));
+}
+
 function pctColor(p) {
   if (p >= 90) return "#ff4d4d";
   if (p >= 70) return "#ffab40";
@@ -170,13 +186,36 @@ async function loadRuntimeSettings() {
     refreshMs = Math.max(30, s.refresh_interval_s) * 1000;
     pillVisibilityMode = s.pill_visibility_mode || "always";
     pillCollapseDelayMs = Math.max(1, s.pill_collapse_delay_s || 3) * 1000;
+    applyPillScale(s.pill_scale);
   } catch (e) {
     console.warn("impostazioni non disponibili, uso i default:", e);
   }
+  applyProviderVisibility();
+}
+
+// Nasconde i bottoni dei provider disattivati e ricalcola i divisori: un
+// divisore ha senso solo tra due provider visibili, quindi va derivato dallo
+// stato corrente invece di legarlo staticamente a un provider in index.html
+// (così non restano divisori orfani in testa/coda o doppi).
+function applyProviderVisibility() {
   for (const [provider, active] of Object.entries(activeProviders)) {
     const ids = RING_IDS[provider];
     if (ids) document.getElementById(ids.btnId).hidden = !active;
   }
+  let seenVisible = false;
+  let pendingDivider = null;
+  for (const el of document.querySelector(".pill").children) {
+    if (el.classList.contains("divider")) {
+      el.hidden = true;
+      pendingDivider = el;
+    } else if (el.classList.contains("provider") && !el.hidden) {
+      if (seenVisible && pendingDivider) pendingDivider.hidden = false;
+      seenVisible = true;
+      pendingDivider = null;
+    }
+  }
+  // Un Panel aperto su un provider appena disattivato va chiuso.
+  if (openProvider && !activeProviders[openProvider]) closeProvider();
 }
 
 async function loadCachedUsage() {
@@ -191,6 +230,7 @@ async function loadCachedUsage() {
   const stale = Date.now() - cached.timestamp * 1000 > CACHE_STALE_MS;
   for (const report of cached.reports) {
     if (!PROVIDER_IDS.includes(report.provider)) continue;
+    if (!activeProviders[report.provider]) continue;
     state[report.provider] = report;
     if (!report.error) everSucceeded[report.provider] = true;
     renderRing(report.provider, report, stale);
@@ -417,9 +457,55 @@ pillEl.addEventListener("contextmenu", (e) => {
 pillEl.addEventListener("mouseenter", wakePill);
 pillEl.addEventListener("pointermove", wakePill);
 
-// Trascinamento nativo via data-tauri-drag-region sulla pill (index.html);
-// qui persistiamo solo la posizione finale, con un debounce per non scrivere
-// su disco a ogni pixel di movimento (plan/step-4.1.md).
+// Il drag nativo di Tauri (data-tauri-drag-region) risale il composedPath e si
+// ferma sul primo elemento cliccabile: sui bottoni provider/impostazioni non
+// parte mai, restava trascinabile solo il padding tra le icone. Qui lo
+// gestiamo a mano con una soglia di movimento, così l'intera barra è
+// trascinabile senza perdere il click che apre il Panel.
+const DRAG_THRESHOLD_PX = 4;
+let dragOrigin = null;
+let draggedSincePointerDown = false;
+
+pillEl.addEventListener("pointerdown", (e) => {
+  if (e.button !== 0) return; // il tasto destro resta il refresh manuale
+  dragOrigin = { x: e.clientX, y: e.clientY };
+  draggedSincePointerDown = false;
+});
+
+pillEl.addEventListener("pointermove", (e) => {
+  if (!dragOrigin || draggedSincePointerDown) return;
+  if (Math.hypot(e.clientX - dragOrigin.x, e.clientY - dragOrigin.y) < DRAG_THRESHOLD_PX) return;
+  draggedSincePointerDown = true;
+  win.startDragging().catch((err) => console.warn("drag non disponibile:", err));
+});
+
+window.addEventListener("pointerup", () => {
+  dragOrigin = null;
+});
+window.addEventListener("pointercancel", () => {
+  dragOrigin = null;
+});
+
+// Se il gesto è finito in un drag, il click conclusivo non deve aprire il
+// Panel né le Impostazioni: intercettato in fase di capture, prima dei
+// listener dei bottoni. Su Windows dopo start_dragging il webview non riceve
+// più né pointerup né click: draggedSincePointerDown resta true ma viene
+// azzerato dal pointerdown del gesto successivo, quindi non mangia il click
+// buono dopo.
+pillEl.addEventListener(
+  "click",
+  (e) => {
+    if (!draggedSincePointerDown) return;
+    draggedSincePointerDown = false;
+    e.stopPropagation();
+    e.preventDefault();
+  },
+  true
+);
+
+// Trascinata la finestra (nativamente o via startDragging), qui persistiamo
+// solo la posizione finale, con un debounce per non scrivere su disco a ogni
+// pixel di movimento (plan/step-4.1.md).
 let dragSaveTimer = null;
 win.onMoved(({ payload }) => {
   clearTimeout(dragSaveTimer);
@@ -430,27 +516,69 @@ win.onMoved(({ payload }) => {
   }, 400);
 });
 
-// La modalità di visibilità va commutabile dalle impostazioni senza
-// riavviare (issue #8): riletta a ogni tick invece di un canale di eventi
-// dedicato, riusando il polling che il resto dell'app già fa ogni TICK_MS.
-async function refreshVisibilitySettings() {
-  const prevMode = pillVisibilityMode;
-  await loadRuntimeSettings();
+// Riallinea il timer di collasso al valore corrente di pillVisibilityMode.
+function realignCollapseTimer(prevMode) {
   if (pillVisibilityMode === prevMode) return;
   if (pillVisibilityMode !== "auto_collapse") {
     clearTimeout(pillCollapseTimer);
-    if (pillCollapsed) {
-      pillCollapsed = false;
-      applyLayout();
-    }
+    pillCollapsed = false;
   } else {
     schedulePillCollapse();
   }
 }
 
+// Applicazione immediata al Salva: settings.js emette "settings-changed",
+// qui rileggiamo le impostazioni (che ora include applyProviderVisibility),
+// riallineiamo il timer di collasso e ridimensioniamo la finestra senza
+// aspettare il prossimo tick.
+async function applySettingsNow() {
+  const prevMode = pillVisibilityMode;
+  await loadRuntimeSettings();
+  realignCollapseTimer(prevMode);
+  await applyLayout();
+}
+window.__TAURI__.event
+  .listen("settings-changed", applySettingsNow)
+  .catch((e) => console.warn("listen settings-changed non disponibile:", e));
+
+// Anteprima live della Scala mentre l'utente muove lo slider nelle
+// Impostazioni: applica la scala e ridimensiona la finestra senza toccare
+// settings.json. La persistenza avviene solo al Salva (settings-changed);
+// chiudere le Impostazioni senza salvare riemette "settings-changed" (Rust)
+// e riporta la Pill alla scala persistita.
+window.__TAURI__.event
+  .listen("pill-scale-preview", ({ payload }) => {
+    applyPillScale(payload);
+    applyLayout();
+  })
+  .catch((e) => console.warn("listen pill-scale-preview non disponibile:", e));
+
+// Rete di sicurezza se l'evento non arriva: la modalità di visibilità e
+// l'insieme dei provider attivi vanno comunque riletti dal polling che il
+// resto dell'app già fa ogni TICK_MS.
+async function refreshVisibilitySettings() {
+  const prevMode = pillVisibilityMode;
+  const prevActive = JSON.stringify(activeProviders);
+  const prevScale = pillScale;
+  await loadRuntimeSettings();
+  const activeChanged = JSON.stringify(activeProviders) !== prevActive;
+  realignCollapseTimer(prevMode);
+  // La scala va nella change-detection: sul percorso di fallback (evento
+  // "settings-changed" perso) senza questo la nuova Scala non produrrebbe
+  // mai un setSize e resterebbe spazio morto trasparente ai bordi.
+  if (pillVisibilityMode !== prevMode || activeChanged || pillScale !== prevScale) applyLayout();
+}
+
 async function boot() {
   await loadRuntimeSettings();
   await loadCachedUsage();
+  await applyLayout(); // restringe la finestra se qualche provider parte disattivato
+  // Ora che la finestra ha la larghezza reale (scala inclusa), ricentra la
+  // Pill se l'utente non l'ha mai spostata: il centraggio nel setup() Rust
+  // gira sui 330x56 dichiarati e con scale grandi sbaglierebbe di molto.
+  invoke("center_if_unpositioned").catch((e) =>
+    console.warn("center_if_unpositioned non disponibile:", e)
+  );
   await tick(true); // il primo giro è sempre forzato, non aspetta il primo tick
   setInterval(() => {
     refreshVisibilitySettings();
