@@ -6,6 +6,7 @@ mod credentials;
 mod notch;
 mod providers;
 mod settings;
+mod tray;
 
 use providers::{
     ClaudeProvider, CodexProvider, CopilotProvider, FetchError, UsageProvider, UsageReport,
@@ -26,8 +27,14 @@ fn get_settings() -> settings::Settings {
 }
 
 #[tauri::command]
-fn save_settings(settings: settings::Settings) {
+fn save_settings(settings: settings::Settings, app: tauri::AppHandle) {
     settings::save(&settings);
+    let reports = cache::load()
+        .map(|cached| cached.reports)
+        .unwrap_or_default();
+    if let Err(error) = tray::sync(&app, &settings, &reports) {
+        eprintln!("[tray] impossibile aggiornare le icone: {error}");
+    }
 }
 
 /// Chiamato dal frontend quando l'utente finisce di trascinare la pill
@@ -77,7 +84,7 @@ fn center_if_unpositioned(window: tauri::WebviewWindow) {
 /// per i provider saltati, così non perde mai dati per un provider
 /// temporaneamente in backoff.
 #[tauri::command]
-async fn get_all_usage(skip: Vec<String>) -> Vec<UsageReport> {
+async fn get_all_usage(skip: Vec<String>, app: tauri::AppHandle) -> Vec<UsageReport> {
     let want = |id: &str| !skip.iter().any(|s| s == id);
 
     let (claude, codex, copilot) = tokio::join!(
@@ -94,6 +101,9 @@ async fn get_all_usage(skip: Vec<String>) -> Vec<UsageReport> {
         merged.push(report.clone());
     }
     cache::save(&merged);
+    if let Err(error) = tray::sync(&app, &settings::load(), &merged) {
+        eprintln!("[tray] impossibile aggiornare i consumi: {error}");
+    }
 
     fresh
 }
@@ -161,6 +171,11 @@ fn main() {
                     }
                 });
             }
+
+            let reports = cache::load()
+                .map(|cached| cached.reports)
+                .unwrap_or_default();
+            tray::sync(app.handle(), &settings::load(), &reports)?;
 
             Ok(())
         })
