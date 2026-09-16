@@ -44,6 +44,7 @@ async function load() {
   document.getElementById("active-copilot").checked = settings.active_providers.copilot !== false;
   document.getElementById("refresh-interval").value = settings.refresh_interval_s;
   document.getElementById("alert-threshold").value = settings.alert_threshold_pct;
+  document.getElementById("show-pill").checked = settings.show_pill !== false;
   document.getElementById("pill-visibility-mode").value = settings.pill_visibility_mode || "always";
   document.getElementById("pill-collapse-delay").value = settings.pill_collapse_delay_s;
   const pct = Math.round((settings.pill_scale ?? 1) * 100);
@@ -67,6 +68,7 @@ async function save() {
   };
   settings.refresh_interval_s = Number(document.getElementById("refresh-interval").value) || 90;
   settings.alert_threshold_pct = Number(document.getElementById("alert-threshold").value) || 80;
+  settings.show_pill = document.getElementById("show-pill").checked;
   settings.pill_visibility_mode = document.getElementById("pill-visibility-mode").value;
   settings.pill_collapse_delay_s = Number(document.getElementById("pill-collapse-delay").value) || 3;
   settings.pill_scale = Number(pillScaleInput.value) / 100 || 1;

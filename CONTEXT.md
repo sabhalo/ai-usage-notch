@@ -16,6 +16,10 @@ _Avoid_: expanded, extended, open (reserve "open" for the Panel)
 The Pill shrunk to a mini tab: rings only, no percentage text. Reached after a configurable period of inactivity, only when Visibility mode is Auto-collapse. Replaces the retired "compact" density toggle outright — there is no third density, and a Pill cannot be both Collapsed and have an open Panel.
 _Avoid_: compact, mini, hidden
 
+**Hidden** (Pill display setting):
+The Pill window is not shown at all. Independent of Visible/Collapsed: disabling “Show Pill” hides the whole window, while the system-tray menus remain available to reopen Settings.
+_Avoid_: collapsed
+
 **Wake**:
 The transition from Collapsed back to Visible, triggered by hovering the Pill. Not called "expand" — that word is retired from this vocabulary because it used to describe the Panel opening, a different axis.
 

@@ -29,15 +29,19 @@ pub fn sync<R: Runtime>(
 ) -> tauri::Result<()> {
     for provider in SUPPORTED_PROVIDER_IDS {
         let tray_id = format!("usage-{provider}");
-        if settings.active_providers.get(provider) == Some(&false) {
+        if !should_show_tray(provider, settings) {
             app.remove_tray_by_id(&tray_id);
             continue;
         }
 
         let mut menu = MenuBuilder::new(app);
-        for (index, line) in usage_lines(provider, reports).into_iter().enumerate() {
-            menu = menu.text(format!("{tray_id}-{index}"), line);
+        if settings.active_providers.get(provider) != Some(&false) {
+            for (index, line) in usage_lines(provider, reports).into_iter().enumerate() {
+                menu = menu.text(format!("{tray_id}-{index}"), line);
+            }
+            menu = menu.separator();
         }
+        menu = menu.text("open-settings", "Impostazioni…");
         let menu = menu.build()?;
 
         if let Some(tray) = app.tray_by_id(&tray_id) {
@@ -58,6 +62,13 @@ pub fn sync<R: Runtime>(
     }
 
     Ok(())
+}
+
+fn should_show_tray(provider: &str, settings: &Settings) -> bool {
+    settings.active_providers.get(provider) != Some(&false)
+        || (!settings.show_pill
+            && !settings.active_providers.values().any(|active| *active)
+            && provider == SUPPORTED_PROVIDER_IDS[0])
 }
 
 fn usage_lines(provider: &str, reports: &[UsageReport]) -> Vec<String> {
@@ -133,5 +144,20 @@ mod tests {
                 "{provider}"
             );
         }
+    }
+
+    #[test]
+    fn keeps_settings_access_when_pill_and_providers_are_hidden() {
+        let mut settings = Settings {
+            show_pill: false,
+            ..Default::default()
+        };
+        settings
+            .active_providers
+            .values_mut()
+            .for_each(|active| *active = false);
+
+        assert!(should_show_tray(SUPPORTED_PROVIDER_IDS[0], &settings));
+        assert!(!should_show_tray(SUPPORTED_PROVIDER_IDS[1], &settings));
     }
 }

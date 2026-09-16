@@ -27,6 +27,10 @@ fn default_alert_threshold_pct() -> f64 {
     80.0
 }
 
+fn default_show_pill() -> bool {
+    true
+}
+
 // "always" | "auto_collapse" — vedi issue #8. La pill non collassa mai finché
 // l'utente non lo sceglie esplicitamente nelle impostazioni.
 fn default_pill_visibility_mode() -> String {
@@ -58,6 +62,8 @@ pub struct Settings {
     pub refresh_interval_s: u64,
     #[serde(default = "default_alert_threshold_pct")]
     pub alert_threshold_pct: f64,
+    #[serde(default = "default_show_pill")]
+    pub show_pill: bool,
     #[serde(default = "default_pill_visibility_mode")]
     pub pill_visibility_mode: String,
     #[serde(default = "default_pill_collapse_delay_s")]
@@ -73,6 +79,7 @@ impl Default for Settings {
             active_providers: default_active_providers(),
             refresh_interval_s: default_refresh_interval_s(),
             alert_threshold_pct: default_alert_threshold_pct(),
+            show_pill: default_show_pill(),
             pill_visibility_mode: default_pill_visibility_mode(),
             pill_collapse_delay_s: default_pill_collapse_delay_s(),
             pill_scale: default_pill_scale(),
@@ -167,6 +174,7 @@ mod tests {
             active_providers: HashMap::new(),
             refresh_interval_s: 42,
             alert_threshold_pct: 73.5,
+            show_pill: false,
             pill_visibility_mode: "auto_collapse".to_string(),
             pill_collapse_delay_s: 9,
             pill_scale: 1.4,
@@ -177,6 +185,7 @@ mod tests {
         assert_eq!(normalized.window_position, Some((12, 34)));
         assert_eq!(normalized.refresh_interval_s, 42);
         assert_eq!(normalized.alert_threshold_pct, 73.5);
+        assert!(!normalized.show_pill);
         assert_eq!(normalized.pill_visibility_mode, "auto_collapse");
         assert_eq!(normalized.pill_collapse_delay_s, 9);
         assert_eq!(normalized.pill_scale, 1.4);

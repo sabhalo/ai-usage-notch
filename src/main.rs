@@ -26,9 +26,21 @@ fn get_settings() -> settings::Settings {
     settings::load()
 }
 
+fn sync_pill_visibility(app: &tauri::AppHandle, show_pill: bool) {
+    use tauri::Manager;
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = if show_pill {
+            window.show()
+        } else {
+            window.hide()
+        };
+    }
+}
+
 #[tauri::command]
 fn save_settings(settings: settings::Settings, app: tauri::AppHandle) {
     settings::save(&settings);
+    sync_pill_visibility(&app, settings.show_pill);
     let reports = cache::load()
         .map(|cached| cached.reports)
         .unwrap_or_default();
@@ -129,12 +141,22 @@ fn main() {
             None,
         ))
         .plugin(tauri_plugin_notification::init())
+        .on_menu_event(|app, event| {
+            use tauri::Manager;
+            if event.id().as_ref() == "open-settings" {
+                if let Some(window) = app.get_webview_window("settings") {
+                    let _ = window.show();
+                    let _ = window.set_focus();
+                }
+            }
+        })
         .setup(|app| {
             use tauri::Manager;
+            let settings = settings::load();
             if let Some(window) = app.get_webview_window("main") {
                 #[cfg(debug_assertions)]
                 window.open_devtools();
-                let saved_position = settings::load().window_position;
+                let saved_position = settings.window_position;
                 if let Some((x, y)) = saved_position {
                     let _ = window.set_position(tauri::Position::Physical(
                         tauri::PhysicalPosition::new(x, y),
@@ -148,6 +170,7 @@ fn main() {
                 } else {
                     center_on_primary_top(&window);
                 }
+                sync_pill_visibility(app.handle(), settings.show_pill);
             }
 
             // Il tasto rosso di chiusura, senza questo intercettore, distrugge
@@ -175,7 +198,7 @@ fn main() {
             let reports = cache::load()
                 .map(|cached| cached.reports)
                 .unwrap_or_default();
-            tray::sync(app.handle(), &settings::load(), &reports)?;
+            tray::sync(app.handle(), &settings, &reports)?;
 
             Ok(())
         })
