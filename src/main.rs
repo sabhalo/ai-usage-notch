@@ -10,8 +10,10 @@ mod tray;
 
 use providers::{
     ClaudeProvider, CodexProvider, CopilotProvider, FetchError, UsageProvider, UsageReport,
-    UsageResult,
+    UsageResult, SUPPORTED_PROVIDER_IDS,
 };
+use std::collections::HashMap;
+use std::time::{Duration, Instant};
 use tauri_plugin_autostart::MacosLauncher;
 
 /// Ultimo dato noto su disco, per dipingere subito la pill all'avvio invece
@@ -120,6 +122,61 @@ async fn get_all_usage(skip: Vec<String>, app: tauri::AppHandle) -> Vec<UsageRep
     fresh
 }
 
+// Il webview Hidden può sospendere i timer JS. In quello stato il backend
+// continua ad aggiornare cache e menu tray usando la stessa fetch della Pill.
+async fn poll_while_hidden(app: tauri::AppHandle) {
+    let mut ticker = tokio::time::interval(Duration::from_secs(30));
+    ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+    let mut next_at = HashMap::new();
+    let mut failures = HashMap::<String, usize>::new();
+
+    loop {
+        ticker.tick().await;
+        let settings = settings::load();
+        if settings.show_pill {
+            next_at.clear();
+            failures.clear();
+            continue;
+        }
+
+        let now = Instant::now();
+        let skip = SUPPORTED_PROVIDER_IDS
+            .iter()
+            .filter(|&&provider| {
+                settings.active_providers.get(provider) == Some(&false)
+                    || next_at.get(provider).is_some_and(|&due| now < due)
+            })
+            .map(|provider| (*provider).to_string())
+            .collect::<Vec<_>>();
+        if skip.len() == SUPPORTED_PROVIDER_IDS.len() {
+            continue;
+        }
+
+        for report in get_all_usage(skip, app.clone()).await {
+            let count = failures.entry(report.provider.clone()).or_default();
+            let delay = next_hidden_poll_delay(&report, count, settings.refresh_interval_s);
+            next_at.insert(report.provider, Instant::now() + delay);
+        }
+    }
+}
+
+fn next_hidden_poll_delay(
+    report: &UsageReport,
+    failures: &mut usize,
+    refresh_interval_s: u64,
+) -> Duration {
+    let seconds = if report.error.is_none() {
+        *failures = 0;
+        refresh_interval_s.max(30)
+    } else if let Some(retry_after) = report.retry_after_s {
+        retry_after
+    } else {
+        *failures += 1;
+        [30, 300, 900][(*failures - 1).min(2)]
+    };
+    Duration::from_secs(seconds)
+}
+
 async fn maybe_fetch<P: UsageProvider>(want: bool, provider: P) -> Option<UsageReport> {
     if !want {
         return None;
@@ -199,6 +256,7 @@ fn main() {
                 .map(|cached| cached.reports)
                 .unwrap_or_default();
             tray::sync(app.handle(), &settings, &reports)?;
+            tauri::async_runtime::spawn(poll_while_hidden(app.handle().clone()));
 
             Ok(())
         })
@@ -212,4 +270,48 @@ fn main() {
         ])
         .run(tauri::generate_context!())
         .expect("errore durante l'avvio dell'applicazione Tauri");
+}
+
+#[cfg(test)]
+mod hidden_poll_tests {
+    use super::*;
+
+    #[test]
+    fn respects_refresh_retry_and_backoff() {
+        let mut failures = 0;
+        let mut report = UsageReport::ok(UsageResult {
+            provider: "codex".into(),
+            windows: vec![],
+        });
+        assert_eq!(
+            next_hidden_poll_delay(&report, &mut failures, 60).as_secs(),
+            60
+        );
+        report.error = Some(providers::ProviderError::RateLimited("wait".into()));
+        report.retry_after_s = Some(120);
+        assert_eq!(
+            next_hidden_poll_delay(&report, &mut failures, 60).as_secs(),
+            120
+        );
+        assert_eq!(failures, 0);
+        report.retry_after_s = None;
+        assert_eq!(
+            next_hidden_poll_delay(&report, &mut failures, 60).as_secs(),
+            30
+        );
+        assert_eq!(
+            next_hidden_poll_delay(&report, &mut failures, 60).as_secs(),
+            300
+        );
+        assert_eq!(
+            next_hidden_poll_delay(&report, &mut failures, 60).as_secs(),
+            900
+        );
+        report.error = None;
+        assert_eq!(
+            next_hidden_poll_delay(&report, &mut failures, 60).as_secs(),
+            60
+        );
+        assert_eq!(failures, 0);
+    }
 }

@@ -246,6 +246,7 @@ function dueProviders(now) {
 // al risultato. `force` bypassa il backoff e interroga tutti gli attivi
 // (refresh manuale, step-3.4.md).
 async function tick(force) {
+  if (!(await win.isVisible())) return; // Hidden: il polling tray gira nel backend
   const now = Date.now();
   const active = Object.keys(backoff).filter((p) => activeProviders[p]);
   const due = force ? active : dueProviders(now);
@@ -534,6 +535,7 @@ function realignCollapseTimer(prevMode) {
 async function applySettingsNow() {
   const prevMode = pillVisibilityMode;
   await loadRuntimeSettings();
+  await loadCachedUsage();
   realignCollapseTimer(prevMode);
   await applyLayout();
 }
