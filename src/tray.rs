@@ -2,7 +2,12 @@ use crate::{
     providers::{UsageReport, SUPPORTED_PROVIDER_IDS},
     settings::Settings,
 };
-use tauri::{image::Image, menu::MenuBuilder, tray::TrayIconBuilder, AppHandle, Runtime};
+use tauri::{
+    image::Image,
+    menu::MenuBuilder,
+    tray::{MouseButton, MouseButtonState, TrayIconBuilder},
+    AppHandle, Runtime,
+};
 
 const TRAY_ICONS: [(&str, &str, &[u8]); 3] = [
     (
@@ -58,6 +63,7 @@ pub fn sync<R: Runtime>(
             .icon_as_template(true)
             .tooltip(title)
             .menu(&menu)
+            .show_menu_on_left_click(false)
             .build(app)?;
     }
 
@@ -69,6 +75,14 @@ fn should_show_tray(provider: &str, settings: &Settings) -> bool {
         || (!settings.show_pill
             && !settings.active_providers.values().any(|active| *active)
             && provider == SUPPORTED_PROVIDER_IDS[0])
+}
+
+pub fn should_refresh_on_click(id: &str, button: MouseButton, state: MouseButtonState) -> bool {
+    button == MouseButton::Left
+        && state == MouseButtonState::Down
+        && id
+            .strip_prefix("usage-")
+            .is_some_and(|provider| SUPPORTED_PROVIDER_IDS.contains(&provider))
 }
 
 fn usage_lines(provider: &str, reports: &[UsageReport]) -> Vec<String> {
@@ -159,5 +173,29 @@ mod tests {
 
         assert!(should_show_tray(SUPPORTED_PROVIDER_IDS[0], &settings));
         assert!(!should_show_tray(SUPPORTED_PROVIDER_IDS[1], &settings));
+    }
+
+    #[test]
+    fn refreshes_once_per_click_on_a_provider_icon() {
+        assert!(should_refresh_on_click(
+            "usage-codex",
+            MouseButton::Left,
+            MouseButtonState::Down
+        ));
+        assert!(!should_refresh_on_click(
+            "usage-codex",
+            MouseButton::Left,
+            MouseButtonState::Up
+        ));
+        assert!(!should_refresh_on_click(
+            "usage-codex",
+            MouseButton::Right,
+            MouseButtonState::Down
+        ));
+        assert!(!should_refresh_on_click(
+            "other",
+            MouseButton::Left,
+            MouseButtonState::Down
+        ));
     }
 }

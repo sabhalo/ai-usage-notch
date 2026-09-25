@@ -452,6 +452,9 @@ pillEl.addEventListener("contextmenu", (e) => {
   e.preventDefault();
   forceRefreshNow();
 });
+window.__TAURI__.event
+  .listen("refresh-now", forceRefreshNow)
+  .catch((e) => console.warn("listen refresh-now non disponibile:", e));
 
 // Sveglia la Pill (torna Visible) al passaggio del mouse; se la modalità è
 // "auto_collapse" riarma anche il timer di collasso (issue #8).

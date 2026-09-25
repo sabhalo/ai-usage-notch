@@ -134,6 +134,8 @@ building from source is the intended installation method.
 | --- | --- |
 | Left click on a ring | Opens or closes that provider's Panel |
 | Right click on the Pill | Forces an immediate refresh of every active provider, ignoring the current backoff |
+| Left click a menu bar provider icon | Forces the same refresh |
+| Right click a menu bar provider icon | Opens its usage menu and Settings |
 | Hover on a collapsed Pill | Returns the Pill to its full size |
 | Drag the Pill | Moves the window and saves the new position |
 | Click the gear | Opens the settings |
@@ -282,8 +284,8 @@ likely changed format. Run `scripts/probe.sh` (or `probe.ps1`), compare with
 fixture with a sanitized real payload.
 
 **The data looks old** — the cache is shown at startup and marked stale after 10
-minutes. A provider in error follows its backoff; right-click the Pill to force
-an immediate attempt.
+minutes. A provider in error follows its backoff; click a menu bar provider
+icon or right-click the Pill to force an immediate attempt.
 
 ## Contributing
 

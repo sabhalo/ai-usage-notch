@@ -207,6 +207,38 @@ fn main() {
                 }
             }
         })
+        .on_tray_icon_event(|app, event| {
+            use tauri::{tray::TrayIconEvent, Emitter};
+            let TrayIconEvent::Click {
+                id,
+                button,
+                button_state,
+                ..
+            } = event
+            else {
+                return;
+            };
+            if !tray::should_refresh_on_click(id.as_ref(), button, button_state) {
+                return;
+            }
+
+            let settings = settings::load();
+            if settings.show_pill {
+                if let Err(error) = app.emit("refresh-now", ()) {
+                    eprintln!("[tray] impossibile richiedere il refresh: {error}");
+                }
+            } else {
+                let skip = SUPPORTED_PROVIDER_IDS
+                    .iter()
+                    .filter(|&&provider| settings.active_providers.get(provider) == Some(&false))
+                    .map(|provider| (*provider).to_string())
+                    .collect();
+                let app = app.clone();
+                tauri::async_runtime::spawn(async move {
+                    get_all_usage(skip, app).await;
+                });
+            }
+        })
         .setup(|app| {
             use tauri::Manager;
             let settings = settings::load();
